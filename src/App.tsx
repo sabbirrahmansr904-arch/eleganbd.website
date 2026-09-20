@@ -51,8 +51,27 @@ import {
   Save,
   Check,
   Layers,
-  Sparkles
+  Sparkles,
+  Upload,
+  MapPin,
+  Database,
+  Boxes,
+  DollarSign,
+  ArrowUpRight,
+  Edit2
 } from 'lucide-react';
+import { 
+  supabase, 
+  saveOrderToSupabase, 
+  syncProductsToSupabase, 
+  testSupabaseConnection,
+  saveFinanceAccountsToSupabase,
+  fetchFinanceAccountsFromSupabase,
+  saveFinanceTransactionToSupabase,
+  fetchFinanceTransactionsFromSupabase,
+  deleteFinanceTransactionFromSupabase,
+  updateFinanceTransactionStatusInSupabase
+} from './lib/supabase';
 import { GoogleGenAI } from "@google/genai";
 import { Product, CartItem, User, Order, Banner, Coupon, Review } from './types';
 import { db, auth, storage } from './firebase';
@@ -356,7 +375,8 @@ const Navbar = ({
   user, 
   searchQuery, 
   setSearchQuery,
-  onSelectCategory
+  onSelectCategory,
+  categories = []
 }: { 
   cartCount: number, 
   onOpenCart: () => void, 
@@ -365,7 +385,8 @@ const Navbar = ({
   user: User | null,
   searchQuery: string,
   setSearchQuery: (query: string) => void,
-  onSelectCategory?: (category: string) => void
+  onSelectCategory?: (category: string) => void,
+  categories?: string[]
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
@@ -373,14 +394,13 @@ const Navbar = ({
   const categoriesDropdownRef = useRef<HTMLDivElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
-  const categories = [
+  const activeCategoriesList = (categories && categories.length > 0)
+    ? categories
+    : ['Formal Pant', 'Formal Shirt', 'Blazer', 'Office Wear', 'Premium Collection', 'Best Seller', 'Cuban Shirt'];
+
+  const categoryItems = [
     { label: 'All Products', value: '' },
-    { label: 'Formal Pant', value: 'Formal Pant' },
-    { label: 'Formal Shirt', value: 'Formal Shirt' },
-    { label: 'Executive Shirt', value: 'Formal Shirt' },
-    { label: 'Casual Shirt', value: 'Casual Shirt' },
-    { label: 'Polo Shirt', value: 'Polo Shirt' },
-    { label: 'Blazer', value: 'Blazer' }
+    ...activeCategoriesList.map(c => ({ label: c, value: c }))
   ];
 
   // Close categories & search on outside click
@@ -458,7 +478,7 @@ const Navbar = ({
                     transition={{ duration: 0.15 }}
                     className="absolute top-full left-0 w-52 bg-white rounded-xl shadow-xl border border-zinc-100 py-2 z-50 overflow-hidden"
                   >
-                    {categories.map((cat, idx) => (
+                    {categoryItems.map((cat, idx) => (
                       <button
                         key={idx}
                         onClick={() => handleCategoryClick(cat.value)}
@@ -650,7 +670,7 @@ const Navbar = ({
                   </button>
                   {isCategoriesOpen && (
                     <div className="pl-3 mt-2 space-y-2 border-l-2 border-zinc-100">
-                      {categories.map((cat, idx) => (
+                      {categoryItems.map((cat, idx) => (
                         <button
                           key={idx}
                           onClick={() => handleCategoryClick(cat.value)}
@@ -1192,43 +1212,43 @@ const BannerCarousel = ({ banners }: { banners: Banner[] }) => {
 };
 
 const TrustFeatureBadges = () => {
-  const features = [
+  const items = [
     {
-      icon: <Truck size={22} className="text-white" strokeWidth={2.2} />,
       title: 'Cash On Delivery',
       subtitle: 'Check before you pay',
+      icon: <Truck size={22} className="text-white" />
     },
     {
-      icon: <ShieldCheck size={22} className="text-white" strokeWidth={2.2} />,
       title: '100% Premium Fabric',
       subtitle: 'Quality Guaranteed',
+      icon: <ShieldCheck size={22} className="text-white" />
     },
     {
-      icon: <ArrowLeftRight size={22} className="text-white" strokeWidth={2.2} />,
       title: 'Easy Exchange',
       subtitle: 'Free size change in 7 days',
+      icon: <ArrowLeftRight size={22} className="text-white" />
     },
     {
-      icon: <Headphones size={22} className="text-white" strokeWidth={2.2} />,
       title: '24/7 Support',
       subtitle: 'Instant help via call or message',
-    },
+      icon: <Headphones size={22} className="text-white" />
+    }
   ];
 
   return (
-    <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 sm:mt-6 md:mt-8 mb-6 sm:mb-8 md:mb-10 relative z-20">
-      <div className="bg-white rounded-[22px] sm:rounded-[26px] md:rounded-[28px] border border-zinc-200/90 shadow-xs hover:shadow-md transition-shadow duration-300 p-4 sm:p-5 md:p-6 lg:p-7">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
-          {features.map((item, idx) => (
-            <div key={idx} className="flex items-center gap-3 sm:gap-3.5 md:gap-4">
-              <div className="w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 rounded-xl sm:rounded-[14px] md:rounded-2xl bg-blue-600 flex items-center justify-center shrink-0 shadow-xs shadow-blue-500/20">
+    <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-5 mb-8 relative z-20">
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-zinc-200/90 shadow-sm p-5 sm:p-6 md:p-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6 lg:gap-8 items-center">
+          {items.map((item, idx) => (
+            <div key={idx} className="flex items-center gap-3.5 sm:gap-4">
+              <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-2xl bg-[#2563eb] flex items-center justify-center shrink-0 shadow-xs">
                 {item.icon}
               </div>
-              <div className="flex flex-col min-w-0">
-                <h4 className="text-xs sm:text-[13px] md:text-sm lg:text-[15px] font-bold text-zinc-900 leading-tight tracking-tight font-sans">
+              <div>
+                <h4 className="text-xs sm:text-sm font-bold text-zinc-900 tracking-tight leading-snug">
                   {item.title}
                 </h4>
-                <p className="text-[10px] sm:text-[11px] md:text-xs text-zinc-500 font-normal leading-tight mt-0.5 sm:mt-1 font-sans">
+                <p className="text-[11px] sm:text-xs text-zinc-500 font-medium leading-tight mt-0.5">
                   {item.subtitle}
                 </p>
               </div>
@@ -1359,7 +1379,7 @@ const FeaturedCollection = ({ products, onSelect, user, onToggleWishlist }: {
     <section className="py-16 md:py-24 bg-[#fafafa]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-10">
-          <h2 className="text-4xl md:text-5xl font-serif font-bold text-[#111827] mb-4 tracking-tight">Featured Collection</h2>
+          <h2 className="text-3xl md:text-5xl font-serif font-bold text-[#111827] mb-4 tracking-tight uppercase">EXPLORE OUR COLLECTION</h2>
           <div className="h-[2px] w-32 bg-[#cca94b] mx-auto mb-10"></div>
           
           <div className="flex flex-wrap justify-center gap-3 mb-6">
@@ -1424,8 +1444,10 @@ const AutoScrollCarousel = ({ products, onSelect, user, onToggleWishlist }: { pr
         if (scrollLeft + clientWidth >= scrollWidth - 10) {
           scrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
         } else {
-          const cardWidth = window.innerWidth < 768 ? 280 : 320;
-          scrollRef.current.scrollBy({ left: cardWidth + 24, behavior: 'smooth' });
+          const w = window.innerWidth;
+          const cardWidth = w < 640 ? 165 : w < 768 ? 220 : w < 1024 ? 250 : 270;
+          const gap = w < 640 ? 14 : w < 1024 ? 24 : 32;
+          scrollRef.current.scrollBy({ left: cardWidth + gap, behavior: 'smooth' });
         }
       }
     }, 3000);
@@ -1440,11 +1462,11 @@ const AutoScrollCarousel = ({ products, onSelect, user, onToggleWishlist }: { pr
       </div>
       <div 
         ref={scrollRef}
-        className="flex gap-6 overflow-x-auto snap-x snap-mandatory px-4 sm:px-6 lg:px-8 pb-8"
+        className="flex gap-3.5 sm:gap-6 lg:gap-8 overflow-x-auto snap-x snap-mandatory px-4 sm:px-6 lg:px-8 pb-8"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {products.map((product, idx) => (
-          <div key={`${product.id}-${idx}`} className="min-w-[280px] md:min-w-[320px] snap-start">
+          <div key={`${product.id}-${idx}`} className="w-[165px] min-w-[165px] sm:w-[220px] sm:min-w-[220px] md:w-[250px] md:min-w-[250px] lg:w-[270px] lg:min-w-[270px] flex-shrink-0 snap-start">
             <ProductCard 
               product={product} 
               onSelect={onSelect} 
@@ -1468,8 +1490,10 @@ const TopRatedCarousel = ({ products, onSelect, user, onToggleWishlist }: { prod
         if (scrollLeft + clientWidth >= scrollWidth - 10) {
           scrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
         } else {
-          const cardWidth = window.innerWidth < 768 ? 280 : 320;
-          scrollRef.current.scrollBy({ left: cardWidth + 24, behavior: 'smooth' });
+          const w = window.innerWidth;
+          const cardWidth = w < 640 ? 165 : w < 768 ? 220 : w < 1024 ? 250 : 270;
+          const gap = w < 640 ? 14 : w < 1024 ? 24 : 32;
+          scrollRef.current.scrollBy({ left: cardWidth + gap, behavior: 'smooth' });
         }
       }
     }, 3000);
@@ -1480,11 +1504,11 @@ const TopRatedCarousel = ({ products, onSelect, user, onToggleWishlist }: { prod
     <div className="w-full overflow-hidden -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8">
       <div 
         ref={scrollRef}
-        className="flex gap-6 overflow-x-auto snap-x snap-mandatory pb-8"
+        className="flex gap-3.5 sm:gap-6 lg:gap-8 overflow-x-auto snap-x snap-mandatory pb-8"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {products.map((product, idx) => (
-          <div key={`${product.id}-${idx}`} className="min-w-[280px] md:min-w-[320px] snap-start">
+          <div key={`${product.id}-${idx}`} className="w-[165px] min-w-[165px] sm:w-[220px] sm:min-w-[220px] md:w-[250px] md:min-w-[250px] lg:w-[270px] lg:min-w-[270px] flex-shrink-0 snap-start">
             <ProductCard 
               product={product} 
               onSelect={onSelect} 
@@ -1497,6 +1521,330 @@ const TopRatedCarousel = ({ products, onSelect, user, onToggleWishlist }: { prod
       </div>
     </div>
   );
+};
+
+const CustomerReviewsSection = ({ showToast }: { showToast: (msg: string, type?: 'success' | 'error' | 'info') => void }) => {
+  const [reviews, setReviews] = useState([
+    {
+      id: '1',
+      name: 'Tanvir Ahmed',
+      location: 'Mirpur, Dhaka',
+      rating: 5,
+      date: '2 days ago',
+      productName: 'Premium Export Quality Formal Pant',
+      comment: 'কাপড়ের কোয়ালিটি এক কথায় অসাধারণ! ফিটিং জাস্ট পারফেক্ট হয়েছে। ডেলিভারিও ২ দিনের মধ্যে পেয়ে গেছি। এলিগান বিডি কে অনেক ধন্যবাদ।',
+      verified: true,
+    },
+    {
+      id: '2',
+      name: 'Sabbir Hossain',
+      location: 'Chittagong',
+      rating: 5,
+      date: '4 days ago',
+      productName: 'Executive Cotton Formal Shirt',
+      comment: 'অনলাইনে অর্ডার করতে ভয় পাচ্ছিলাম, কিন্তু কাপড়ের ফিনিশিং দেখে চমকে গেছি। ঢাকার বাইরে এত দ্রুত ডেলিভারি দেওয়ার জন্য ধন্যবাদ।',
+      verified: true,
+    },
+    {
+      id: '3',
+      name: 'Mahmudul Hasan',
+      location: 'Sylhet',
+      rating: 5,
+      date: '1 week ago',
+      productName: 'Slim Fit Formal Pant (Black)',
+      comment: 'প্যান্টের ফ্যাব্রিক খুব কমফোর্টেবল। গরমের দিনেও পরে খুব আরাম পাওয়া যায়। রিপিট কাস্টমার হব ইনশাল্লাহ।',
+      verified: true,
+    },
+    {
+      id: '4',
+      name: 'Anik Rahman',
+      location: 'Uttara, Dhaka',
+      rating: 5,
+      date: '1 week ago',
+      productName: 'Cuban Collar Casual Shirt',
+      comment: 'কালার এবং সাইজ এক্সেক্ট ছবির মতো ছিল। হোম ডেলিভারির সময় হাতে পেয়ে চেক করে টাকা দিতে পেরেছি।',
+      verified: true,
+    },
+    {
+      id: '5',
+      name: 'Rafiqul Islam',
+      location: 'Rajshahi',
+      rating: 5,
+      date: '2 weeks ago',
+      productName: 'Premium Tailored Blazer',
+      comment: 'প্রিমিয়াম কোয়ালিটি ব্লেজার! বিয়ে বাড়ির অনুষ্ঠানে পরেছিলাম, সবাই প্রশংসা করেছে। সাইজ না মিললে এক্সচেঞ্জ এর সুবিধাও খুব ভালো।',
+      verified: true,
+    },
+    {
+      id: '6',
+      name: 'Shahriar Nafis',
+      location: 'Khulna',
+      rating: 5,
+      date: '2 weeks ago',
+      productName: 'Stretchable Formal Pant',
+      comment: 'স্ট্রেচেবল কাপড় হওয়ায় মুভমেন্টে খুব আরাম। প্রাইজ হিসেবে সার্ভিস এবং কোয়ালিটি এ ওয়ান।',
+      verified: true,
+    },
+  ]);
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newReview, setNewReview] = useState({
+    name: '',
+    location: '',
+    productName: '',
+    rating: 5,
+    comment: ''
+  });
+
+  const handleSubmitReview = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newReview.name.trim() || !newReview.comment.trim()) {
+      showToast('Please fill in your name and review message', 'error');
+      return;
+    }
+    const item = {
+      id: Date.now().toString(),
+      name: newReview.name,
+      location: newReview.location || 'Dhaka',
+      rating: newReview.rating,
+      date: 'Just now',
+      productName: newReview.productName || 'Formal Wear',
+      comment: newReview.comment,
+      verified: true
+    };
+    setReviews([item, ...reviews]);
+    setIsModalOpen(false);
+    setNewReview({ name: '', location: '', productName: '', rating: 5, comment: '' });
+    showToast('ধন্যবাদ! আপনার মূল্যবান রিভিউটি যুক্ত করা হয়েছে।', 'success');
+  };
+
+  return (
+    <section className="py-16 md:py-24 bg-[#0d111c] text-white relative overflow-hidden">
+      {/* Background Decorative Accents */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-amber-500/10 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/10 blur-[120px] rounded-full pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        
+        {/* Section Title & Metrics */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-400/10 border border-amber-400/30 text-amber-300 text-xs font-bold uppercase tracking-widest mb-4">
+              <Star size={14} className="fill-amber-400 text-amber-400" />
+              <span>Customer Satisfaction</span>
+            </div>
+            <h2 className="text-3xl md:text-5xl font-serif font-bold text-white tracking-tight">
+              Customer Reviews & Feedback
+            </h2>
+            <p className="text-zinc-400 text-sm md:text-base mt-2 max-w-xl">
+              ১০,০০০+ এরও বেশি সন্তুষ্ট গ্রাহকের বিশ্বাস ও আস্থার অভিজ্ঞতা জানুন
+            </p>
+          </div>
+
+          <div className="flex items-center gap-4 bg-zinc-900/80 border border-zinc-800 p-4 rounded-2xl shrink-0">
+            <div className="text-center pr-4 border-r border-zinc-800">
+              <p className="text-3xl font-extrabold text-amber-400 font-sans">4.9</p>
+              <div className="flex gap-0.5 justify-center mt-1">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} size={12} className="fill-amber-400 text-amber-400" />
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-bold text-white">1,250+ Verified Reviews</p>
+              <p className="text-[11px] text-zinc-400 mt-0.5">99.2% Positive Feedback Rate</p>
+              <button 
+                onClick={() => setIsModalOpen(true)}
+                className="mt-2 text-xs font-bold text-amber-400 hover:text-amber-300 underline cursor-pointer transition-colors"
+              >
+                + Write a Review
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Reviews Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {reviews.map((rev) => (
+            <div 
+              key={rev.id}
+              className="bg-zinc-900/90 border border-zinc-800/90 hover:border-amber-500/40 p-6 rounded-2xl flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 shadow-lg"
+            >
+              <div>
+                {/* Star Rating & Verified Badge */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex gap-1">
+                    {[...Array(rev.rating)].map((_, i) => (
+                      <Star key={i} size={15} className="fill-amber-400 text-amber-400" />
+                    ))}
+                  </div>
+                  {rev.verified && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/80 px-2.5 py-0.5 rounded-full">
+                      <CheckCircle2 size={11} /> Verified Buyer
+                    </span>
+                  )}
+                </div>
+
+                {/* Review Content */}
+                <p className="text-zinc-200 text-sm leading-relaxed mb-6 italic">
+                  "{rev.comment}"
+                </p>
+              </div>
+
+              {/* Author & Product */}
+              <div className="pt-4 border-t border-zinc-800/80 flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-white">{rev.name}</h4>
+                  <p className="text-xs text-zinc-400">{rev.location}</p>
+                </div>
+                <div className="text-right max-w-[140px]">
+                  <p className="text-[10px] text-amber-400/90 font-bold uppercase truncate">{rev.productName}</p>
+                  <p className="text-[10px] text-zinc-500">{rev.date}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+      </div>
+
+      {/* Write a Review Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-md w-full p-6 text-white shadow-2xl relative">
+            <button 
+              onClick={() => setIsModalOpen(false)}
+              className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-white cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+
+            <h3 className="text-xl font-serif font-bold text-amber-400 mb-1">Write a Customer Review</h3>
+            <p className="text-xs text-zinc-400 mb-6">আপনার অভিজ্ঞতা আমাদের সাথে শেয়ার করুন</p>
+
+            <form onSubmit={handleSubmitReview} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase text-zinc-400 mb-1">Your Name *</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="e.g. Tanvir Ahmed"
+                  value={newReview.name}
+                  onChange={(e) => setNewReview({...newReview, name: e.target.value})}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-zinc-400 mb-1">Your Location / District</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Mirpur, Dhaka"
+                  value={newReview.location}
+                  onChange={(e) => setNewReview({...newReview, location: e.target.value})}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-zinc-400 mb-1">Purchased Product</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Formal Pant / Cotton Shirt"
+                  value={newReview.productName}
+                  onChange={(e) => setNewReview({...newReview, productName: e.target.value})}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-zinc-400 mb-1">Star Rating</label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      type="button"
+                      key={star}
+                      onClick={() => setNewReview({...newReview, rating: star})}
+                      className="p-1 cursor-pointer"
+                    >
+                      <Star size={22} className={star <= newReview.rating ? "fill-amber-400 text-amber-400" : "text-zinc-600"} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-zinc-400 mb-1">Review Message *</label>
+                <textarea 
+                  required
+                  rows={3}
+                  placeholder="আপনার প্রতিক্রিয়া লিখুন..."
+                  value={newReview.comment}
+                  onChange={(e) => setNewReview({...newReview, comment: e.target.value})}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-400"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase text-zinc-400 hover:text-white cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-zinc-950 font-bold rounded-xl text-xs uppercase tracking-wider transition-colors cursor-pointer"
+                >
+                  Submit Review
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+};
+
+const parseProductSizes = (sizes: any, category?: string, name?: string): string[] => {
+  const isPant = (category && category.toLowerCase().includes('pant')) || (name && name.toLowerCase().includes('pant'));
+  if (isPant) {
+    let parsed: string[] = [];
+    if (Array.isArray(sizes) && sizes.length > 0) {
+      parsed = sizes.map((s: any) => String(s).trim()).filter(Boolean);
+    } else if (typeof sizes === 'string' && sizes.trim().length > 0) {
+      parsed = sizes.split(',').map((s: string) => s.trim()).filter(Boolean);
+    }
+    const fullPantSizes = ['28', '30', '32', '34', '36', '38', '40'];
+    if (parsed.length === 0) return fullPantSizes;
+    const hasPantNum = parsed.some(s => fullPantSizes.includes(s));
+    if (hasPantNum) {
+      const combined = Array.from(new Set([...fullPantSizes, ...parsed]));
+      return combined.sort((a, b) => (parseInt(a) || 0) - (parseInt(b) || 0));
+    }
+    return parsed;
+  }
+
+  if (Array.isArray(sizes) && sizes.length > 0) {
+    return sizes.map((s: any) => String(s).trim()).filter(Boolean);
+  }
+  if (typeof sizes === 'string' && sizes.trim().length > 0) {
+    return sizes.split(',').map((s: string) => s.trim()).filter(Boolean);
+  }
+  const isShirt = (category && category.toLowerCase().includes('shirt')) || (name && name.toLowerCase().includes('shirt'));
+  return isShirt ? ['M', 'L', 'XL', 'XXL'] : ['28', '30', '32', '34', '36', '38', '40'];
+};
+
+const parseProductColors = (colors: any): string[] => {
+  if (Array.isArray(colors) && colors.length > 0) {
+    return colors.map((c: any) => String(c).trim()).filter(Boolean);
+  }
+  if (typeof colors === 'string' && colors.trim().length > 0) {
+    return colors.split(',').map((c: string) => c.trim()).filter(Boolean);
+  }
+  return ['Standard'];
 };
 
 const ProductDetails = ({ product, onAddToCart, onBack, onBuyNow, user, showToast, onNavigate, onCategoryClick }: { 
@@ -1518,19 +1866,34 @@ const ProductDetails = ({ product, onAddToCart, onBack, onBuyNow, user, showToas
   const [newReview, setNewReview] = useState({ user_name: '', rating: 5, comment: '' });
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
-  const getImages = (images: any) => {
-    if (!images) return [];
-    if (Array.isArray(images)) return images;
-    if (typeof images === 'string') {
-      try {
-        const parsed = JSON.parse(images);
-        return Array.isArray(parsed) ? parsed : [images];
-      } catch (e) {
-        return [images];
+  const getImages = (images: any, primaryImage?: string) => {
+    let list: string[] = [];
+    if (images) {
+      if (Array.isArray(images)) list = images.filter(Boolean);
+      else if (typeof images === 'string') {
+        try {
+          const parsed = JSON.parse(images);
+          list = Array.isArray(parsed) ? parsed.filter(Boolean) : [images];
+        } catch (e) {
+          list = [images];
+        }
       }
     }
-    return [];
+    if (primaryImage && !list.includes(primaryImage)) {
+      list = [primaryImage, ...list];
+    }
+    return list;
   };
+
+  const productImagesList = getImages(product.images, product.image);
+
+  useEffect(() => {
+    if (productImagesList.length > 0) {
+      setActiveImage(productImagesList[0]);
+    } else {
+      setActiveImage(product.image);
+    }
+  }, [product.id, product.image, JSON.stringify(product.images)]);
 
   useEffect(() => {
     fetchReviews();
@@ -1612,13 +1975,13 @@ const ProductDetails = ({ product, onAddToCart, onBack, onBuyNow, user, showToas
             />
           </div>
           
-          {getImages(product.images).length > 1 && (
-            <div className="grid grid-cols-4 gap-4">
-              {getImages(product.images).map((img: string, idx: number) => (
+          {productImagesList.length > 1 && (
+            <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
+              {productImagesList.map((img: string, idx: number) => (
                 <button 
                   key={idx}
                   onClick={() => setActiveImage(img)}
-                  className={`aspect-square border-2 overflow-hidden transition-all ${activeImage === img ? 'border-zinc-900' : 'border-transparent hover:border-zinc-200'}`}
+                  className={`aspect-square border-2 rounded-xl overflow-hidden transition-all ${activeImage === img ? 'border-zinc-900 ring-2 ring-zinc-900/10 scale-102' : 'border-zinc-200 hover:border-zinc-400 opacity-75 hover:opacity-100'}`}
                 >
                   <img src={img || null} alt={`${product.name} ${idx + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?q=80&w=800&auto=format&fit=crop'; }} />
                 </button>
@@ -1646,42 +2009,35 @@ const ProductDetails = ({ product, onAddToCart, onBack, onBuyNow, user, showToas
           </div>
 
           <div className="mb-8">
-            <h4 className="text-sm font-bold uppercase tracking-widest mb-4">Select Color</h4>
-            <div className="flex flex-wrap gap-2">
-              {(Array.isArray(product.colors) ? product.colors : (typeof product.colors === 'string' ? (product.colors as string).split(',').map(c => c.trim()).filter(Boolean) : [])).map(color => (
-                <button
-                  key={color}
-                  onClick={() => {
-                    setSelectedColor(color as string);
-                    setSelectedSize(null);
-                  }}
-                  className={`px-4 py-2 text-xs font-bold uppercase tracking-widest border transition-all ${selectedColor === color ? 'bg-zinc-900 text-white border-zinc-900 shadow-lg' : 'border-zinc-200 text-zinc-500 hover:border-zinc-900'}`}
-                >
-                  {color}
-                </button>
-              ))}
-            </div>
-            {!selectedColor && (Array.isArray(product.colors) ? product.colors : []).length > 0 && (
-              <p className="text-[10px] text-amber-600 font-bold uppercase tracking-widest mt-2 animate-pulse">Please select a color first</p>
-            )}
-          </div>
-
-          <div className="mb-8">
             <h4 className="text-sm font-bold uppercase tracking-widest mb-4">Select Size</h4>
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-              {(Array.isArray(product.sizes) ? product.sizes : (typeof product.sizes === 'string' ? (product.sizes as string).split(',').map(s => s.trim()).filter(Boolean) : [])).map(size => {
-                const stock = selectedColor && product.stockMap ? (product.stockMap[selectedColor]?.[size] || 0) : 0;
-                const isOutOfStock = selectedColor && stock <= 0;
-                const hasColors = (Array.isArray(product.colors) ? product.colors : (typeof product.colors === 'string' ? (product.colors as string).split(',') : [])).filter(Boolean).length > 0;
+              {parseProductSizes(product.sizes, product.category, product.name).map(size => {
+                let isOutOfStock = false;
+                if (product.stockMap && Object.keys(product.stockMap).length > 0) {
+                  const sizeStock = Object.values(product.stockMap).reduce((sum: number, colStock: any) => sum + (colStock?.[size] || 0), 0);
+                  if (sizeStock <= 0) isOutOfStock = true;
+                } else if (product.stock !== undefined && product.stock <= 0) {
+                  isOutOfStock = true;
+                }
 
-                if (isOutOfStock) return null;
+                if (isOutOfStock) {
+                  return (
+                    <button
+                      key={size}
+                      disabled
+                      className="py-3 text-sm font-medium border border-zinc-100 bg-zinc-50 text-zinc-300 line-through cursor-not-allowed rounded-lg"
+                    >
+                      {size}
+                    </button>
+                  );
+                }
 
                 return (
                   <button
                     key={size}
+                    type="button"
                     onClick={() => setSelectedSize(size)}
-                    disabled={hasColors && !selectedColor}
-                    className={`py-3 text-sm font-medium border transition-all ${selectedSize === size ? 'bg-zinc-900 text-white border-zinc-900' : 'border-zinc-200 text-zinc-600 hover:border-zinc-900'} ${hasColors && !selectedColor ? 'opacity-30 cursor-not-allowed' : ''}`}
+                    className={`py-3 text-sm font-medium border rounded-lg transition-all cursor-pointer ${selectedSize === size ? 'bg-zinc-900 text-white border-zinc-900 shadow-md scale-102 font-bold' : 'border-zinc-200 text-zinc-700 hover:border-zinc-900 hover:bg-zinc-50'}`}
                   >
                     {size}
                   </button>
@@ -1957,7 +2313,21 @@ const CartDrawer = ({ isOpen, onClose, items, onUpdateQty, onRemove, onCheckout 
   );
 };
 
-const CheckoutPage = ({ items, onBack, onComplete, showToast }: { items: CartItem[], onBack: () => void, onComplete: (orderId?: string) => void, showToast: (msg: string, type?: 'success' | 'error' | 'info') => void }) => {
+const CheckoutPage = ({ 
+  items, 
+  onBack, 
+  onComplete, 
+  showToast,
+  onUpdateQty,
+  onRemoveItem
+}: { 
+  items: CartItem[], 
+  onBack: () => void, 
+  onComplete: (orderId?: string) => void, 
+  showToast: (msg: string, type?: 'success' | 'error' | 'info') => void,
+  onUpdateQty?: (id: number | string, size: any, delta: number, color?: string) => void,
+  onRemoveItem?: (id: number | string, size: any, color?: string) => void
+}) => {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -2065,6 +2435,7 @@ const CheckoutPage = ({ items, onBack, onComplete, showToast }: { items: CartIte
         created_at: new Date().toISOString()
       };
       const docRef = await addDoc(collection(db, 'orders'), orderData);
+      saveOrderToSupabase({ ...orderData, order_id: docRef.id });
       onComplete(docRef.id);
     } catch (error) {
       console.error("Checkout error:", error);
@@ -2138,84 +2509,24 @@ const CheckoutPage = ({ items, onBack, onComplete, showToast }: { items: CartIte
             
             <div className="pt-8">
               <h3 className="text-sm font-bold uppercase tracking-widest mb-4">Payment Method</h3>
-              <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => setFormData({...formData, paymentMethod: 'COD'})}
-                  className={`w-full p-4 border flex items-center justify-between transition-all ${formData.paymentMethod === 'COD' ? 'border-zinc-900 bg-zinc-50' : 'border-zinc-200 hover:border-zinc-400'}`}
-                >
-                  <span className="font-medium">Cash on Delivery (COD)</span>
-                  {formData.paymentMethod === 'COD' && <ShieldCheck className="text-zinc-900" size={20} />}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setFormData({...formData, paymentMethod: 'bKash'})}
-                  className={`w-full p-4 border flex items-center justify-between transition-all ${formData.paymentMethod === 'bKash' ? 'border-zinc-900 bg-zinc-50' : 'border-zinc-200 hover:border-zinc-400'}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <img 
-                      src="https://i.postimg.cc/FNktNhrf/1656234782bkash-app-logo.png" 
-                      alt="bKash" 
-                      className="w-8 h-8 object-contain rounded"
-                      referrerPolicy="no-referrer"
-                    />
-                    <span className="font-medium">bKash Send Money</span>
+              <div className="p-4 border-2 border-zinc-900 bg-zinc-50 rounded-xl flex items-center justify-between shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shrink-0 shadow-xs">
+                    <Truck size={20} />
                   </div>
-                  {formData.paymentMethod === 'bKash' && <ShieldCheck className="text-zinc-900" size={20} />}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setFormData({...formData, paymentMethod: 'Nagad'})}
-                  className={`w-full p-4 border flex items-center justify-between transition-all ${formData.paymentMethod === 'Nagad' ? 'border-zinc-900 bg-zinc-50' : 'border-zinc-200 hover:border-zinc-400'}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <img 
-                      src="https://i.postimg.cc/Dv0j6cmq/images.png" 
-                      alt="Nagad" 
-                      className="w-8 h-8 object-contain rounded"
-                      referrerPolicy="no-referrer"
-                    />
-                    <span className="font-medium">Nagad Send Money</span>
+                  <div>
+                    <span className="font-bold text-zinc-900 block text-sm">Cash on Delivery (COD)</span>
+                    <p className="text-xs text-zinc-500 font-medium mt-0.5">পণ্য হাতে পেয়ে দেখে মূল্য পরিশোধ করুন</p>
                   </div>
-                  {formData.paymentMethod === 'Nagad' && <ShieldCheck className="text-zinc-900" size={20} />}
-                </button>
+                </div>
+                <ShieldCheck className="text-blue-600 shrink-0" size={24} />
               </div>
-
-              {formData.paymentMethod === 'COD' ? (
-                <p className="text-xs text-zinc-400 mt-2 italic">Pay when you receive the product at your doorstep.</p>
-              ) : (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-6 p-6 bg-zinc-900 text-white rounded-xl space-y-4"
-                >
-                  <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                    <span className="text-sm text-white/60">Send Money to:</span>
-                    <span className="text-lg font-bold tracking-wider">01631496122</span>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-xs text-white/60 leading-relaxed">
-                      Please send <span className="text-white font-bold">৳{total}</span> to the number above using {formData.paymentMethod} "Send Money" option. After sending, enter the Transaction ID below.
-                    </p>
-                    <input 
-                      required
-                      type="text"
-                      placeholder="Enter Transaction ID"
-                      className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-sm outline-none focus:border-white/40 transition-all"
-                      value={formData.transactionId}
-                      onChange={e => setFormData({...formData, transactionId: e.target.value})}
-                    />
-                  </div>
-                </motion.div>
-              )}
             </div>
 
             <button 
               type="submit" 
-              disabled={isSubmitting}
-              className="w-full btn-primary py-4 mt-8 flex items-center justify-center gap-2"
+              disabled={isSubmitting || items.length === 0}
+              className="w-full btn-primary py-4 mt-8 flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {isSubmitting ? 'Processing...' : 'Confirm Order'}
               {!isSubmitting && <ChevronRight size={18} />}
@@ -2223,28 +2534,110 @@ const CheckoutPage = ({ items, onBack, onComplete, showToast }: { items: CartIte
           </form>
         </div>
 
-        <div className="bg-zinc-50 p-8 h-fit sticky top-32">
-          <h2 className="text-xl font-serif font-bold mb-6">Order Summary</h2>
-          <div className="space-y-4 mb-8">
-            {items.map(item => (
-              <div key={`${item.id}-${item.selectedSize}-${item.selectedColor || ''}`} className="flex justify-between items-start text-sm">
-                <div className="flex flex-col">
-                  <span className="text-zinc-600 font-medium">
-                    {item.name} ({item.selectedSize}{item.selectedColor ? `, ${item.selectedColor}` : ''}) x {item.quantity}
-                  </span>
-                  {(item.stockMap && item.selectedColor && item.selectedSize ? 
-                    (item.stockMap[item.selectedColor]?.[item.selectedSize] || 0) <= 0 : 
-                    (item.stock || 0) <= 0) && (
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                      <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">Stock Out</span>
-                    </div>
-                  )}
-                </div>
-                <span className="font-bold whitespace-nowrap">৳{item.price * item.quantity}</span>
-              </div>
-            ))}
+        <div className="bg-zinc-50 p-6 sm:p-8 h-fit sticky top-32 rounded-2xl border border-zinc-200/80 shadow-xs">
+          <div className="flex items-center justify-between mb-6 pb-4 border-b border-zinc-200">
+            <h2 className="text-xl font-serif font-bold text-zinc-900">Order Summary</h2>
+            <span className="text-xs font-bold bg-zinc-200 text-zinc-800 px-3 py-1 rounded-full">
+              {items.length} {items.length === 1 ? 'Item' : 'Items'}
+            </span>
           </div>
+
+          {items.length === 0 ? (
+            <div className="py-12 text-center space-y-4">
+              <ShoppingBag size={48} className="mx-auto text-zinc-300" />
+              <p className="text-zinc-600 text-sm font-medium">আপনার কার্টে কোন প্রোডাক্ট নেই</p>
+              <button
+                type="button"
+                onClick={onBack}
+                className="px-6 py-2.5 bg-zinc-900 text-white rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-zinc-800 transition-colors cursor-pointer"
+              >
+                Back to Shopping
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-3.5 mb-6 max-h-[380px] overflow-y-auto pr-1">
+                {items.map(item => (
+                  <div 
+                    key={`${item.id}-${item.selectedSize}-${item.selectedColor || ''}`} 
+                    className="p-3.5 bg-white rounded-xl border border-zinc-200/90 shadow-2xs flex gap-3.5 items-center"
+                  >
+                    {/* Product Image */}
+                    <div className="w-16 h-20 bg-zinc-100 rounded-lg overflow-hidden shrink-0">
+                      <img 
+                        src={item.image || 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?q=80&w=800&auto=format&fit=crop'} 
+                        alt={item.name} 
+                        className="w-full h-full object-cover" 
+                        referrerPolicy="no-referrer"
+                        onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?q=80&w=800&auto=format&fit=crop'; }}
+                      />
+                    </div>
+
+                    {/* Product Details & Quantity Controls */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start gap-2">
+                        <h4 className="text-xs sm:text-sm font-bold text-zinc-900 line-clamp-1">{item.name}</h4>
+                        {onRemoveItem && (
+                          <button 
+                            type="button"
+                            onClick={() => onRemoveItem(item.id, item.selectedSize, item.selectedColor)}
+                            className="text-zinc-400 hover:text-red-500 transition-colors p-0.5 shrink-0 cursor-pointer"
+                            title="Remove item"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 text-[10px] font-bold text-zinc-500 uppercase tracking-wider mt-0.5">
+                        <span>Size: <strong className="text-zinc-800">{item.selectedSize}</strong></span>
+                        {item.selectedColor && (
+                          <span>Color: <strong className="text-zinc-800">{item.selectedColor}</strong></span>
+                        )}
+                      </div>
+
+                      {/* Stock warning */}
+                      {(item.stockMap && item.selectedColor && item.selectedSize ? 
+                        (item.stockMap[item.selectedColor]?.[item.selectedSize] || 0) <= 0 : 
+                        (item.stock || 0) <= 0) && (
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                          <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">Stock Out</span>
+                        </div>
+                      )}
+
+                      {/* Quantity Controls & Item Total */}
+                      <div className="flex items-center justify-between mt-2">
+                        <div className="flex items-center border border-zinc-200 rounded-lg overflow-hidden bg-zinc-50">
+                          <button
+                            type="button"
+                            onClick={() => onUpdateQty && onUpdateQty(item.id, item.selectedSize, -1, item.selectedColor)}
+                            className="w-7 h-7 flex items-center justify-center text-zinc-600 hover:bg-zinc-200 transition-colors font-bold text-xs cursor-pointer"
+                            aria-label="Decrease quantity"
+                          >
+                            -
+                          </button>
+                          <span className="w-8 text-center text-xs font-extrabold text-zinc-900">
+                            {item.quantity}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => onUpdateQty && onUpdateQty(item.id, item.selectedSize, 1, item.selectedColor)}
+                            className="w-7 h-7 flex items-center justify-center text-zinc-600 hover:bg-zinc-200 transition-colors font-bold text-xs cursor-pointer"
+                            aria-label="Increase quantity"
+                          >
+                            +
+                          </button>
+                        </div>
+
+                        <span className="text-xs sm:text-sm font-extrabold text-zinc-900">
+                          ৳{(item.price * item.quantity).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
           
           <div className="pt-6 border-t border-zinc-200 mb-6">
              <label className="block text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">Discount Coupon</label>
@@ -2293,6 +2686,8 @@ const CheckoutPage = ({ items, onBack, onComplete, showToast }: { items: CartIte
               <span>৳{total}</span>
             </div>
           </div>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -2385,10 +2780,11 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
     price: 0,
     originalPrice: 0,
     image: '',
+    images: [] as string[],
     fabric: 'Woven Cotton',
     fit: 'Slim Fit',
     description: '',
-    sizes: '30, 32, 34, 36, 38',
+    sizes: '28, 30, 32, 34, 36, 38, 40',
     colors: 'Black, Navy, Grey',
     stockMap: {} as { [color: string]: { [size: string]: number } },
     stock: 100,
@@ -2430,30 +2826,10 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
   const [isBulkSaving, setIsBulkSaving] = useState(false);
   const [savedProductSuccess, setSavedProductSuccess] = useState<{ [productId: string]: boolean }>({});
 
-  const parseProductSizes = (sizes: any): string[] => {
-    if (Array.isArray(sizes) && sizes.length > 0) {
-      return sizes.map((s: any) => String(s).trim()).filter(Boolean);
-    }
-    if (typeof sizes === 'string' && sizes.trim().length > 0) {
-      return sizes.split(',').map((s: string) => s.trim()).filter(Boolean);
-    }
-    return ['30', '32', '34', '36', '38'];
-  };
-
-  const parseProductColors = (colors: any): string[] => {
-    if (Array.isArray(colors) && colors.length > 0) {
-      return colors.map((c: any) => String(c).trim()).filter(Boolean);
-    }
-    if (typeof colors === 'string' && colors.trim().length > 0) {
-      return colors.split(',').map((c: string) => c.trim()).filter(Boolean);
-    }
-    return ['Standard'];
-  };
-
   const initializeMasterStock = (items: Product[]) => {
     const initEdits: typeof masterStockEdits = {};
     items.forEach(p => {
-      const pSizes = parseProductSizes(p.sizes);
+      const pSizes = parseProductSizes(p.sizes, p.category, p.name);
       const pColors = parseProductColors(p.colors);
       
       const baseMap = p.stockMap ? JSON.parse(JSON.stringify(p.stockMap)) : {};
@@ -2695,7 +3071,7 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
     const pIdStr = productId.toString();
     const product = products.find(p => p.id.toString() === pIdStr);
     if (!product) return;
-    const pSizes = parseProductSizes(product.sizes);
+    const pSizes = parseProductSizes(product.sizes, product.category, product.name);
     const pColors = parseProductColors(product.colors);
     
     setMasterStockEdits(prev => {
@@ -2734,15 +3110,15 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
     setSavingProductId(pIdStr);
     try {
       let totalStock = 0;
-      Object.values(editData.stockMap).forEach(sizeMap => {
+      Object.values(editData?.stockMap || {}).forEach(sizeMap => {
         Object.values(sizeMap || {}).forEach(qty => {
           totalStock += (Number(qty) || 0);
         });
       });
       const dataToUpdate = {
-        stockMap: editData.stockMap,
+        stockMap: editData?.stockMap || {},
         stock: totalStock,
-        stockStatus: editData.stockStatus
+        stockStatus: editData?.stockStatus || 'In Stock'
       };
       await updateDoc(doc(db, 'products', pIdStr), dataToUpdate);
       setProducts(prev => prev.map(p => p.id.toString() === pIdStr ? { ...p, ...dataToUpdate } : p));
@@ -2778,15 +3154,15 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
       await Promise.all(changedProductIds.map(async (pIdStr) => {
         const editData = masterStockEdits[pIdStr];
         let totalStock = 0;
-        Object.values(editData.stockMap).forEach(sizeMap => {
+        Object.values(editData?.stockMap || {}).forEach(sizeMap => {
           Object.values(sizeMap || {}).forEach(qty => {
             totalStock += (Number(qty) || 0);
           });
         });
         const dataToUpdate = {
-          stockMap: editData.stockMap,
+          stockMap: editData?.stockMap || {},
           stock: totalStock,
-          stockStatus: editData.stockStatus
+          stockStatus: editData?.stockStatus || 'In Stock'
         };
         await updateDoc(doc(db, 'products', pIdStr), dataToUpdate);
       }));
@@ -2795,7 +3171,7 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
         const editData = masterStockEdits[p.id.toString()];
         if (editData && editData.hasChanges) {
           let totalStock = 0;
-          Object.values(editData.stockMap).forEach(sizeMap => {
+          Object.values(editData?.stockMap || {}).forEach(sizeMap => {
             Object.values(sizeMap || {}).forEach(qty => {
               totalStock += (Number(qty) || 0);
             });
@@ -2829,7 +3205,9 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
 
   const openAddProductModal = () => {
     setEditingProduct(null);
-    const defaultSizes = ['30', '32', '34', '36', '38'];
+    const cat = productFormData.category || 'Formal Pant';
+    const isShirt = cat.toLowerCase().includes('shirt');
+    const defaultSizes = isShirt ? ['M', 'L', 'XL', 'XXL'] : ['28', '30', '32', '34', '36', '38', '40'];
     const defaultColors = ['Black', 'Navy', 'Grey'];
     const initialStockMap: { [color: string]: { [size: string]: number } } = {};
     defaultColors.forEach(c => {
@@ -2840,17 +3218,18 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
     });
     setProductFormData({
       name: '',
-      category: 'Formal Pant',
+      category: cat,
       price: 0,
       originalPrice: 0,
       image: '',
+      images: [],
       fabric: 'Woven Cotton',
       fit: 'Slim Fit',
       description: '',
       sizes: defaultSizes.join(', '),
       colors: defaultColors.join(', '),
       stockMap: initialStockMap,
-      stock: 300,
+      stock: defaultSizes.length * defaultColors.length * 20,
       stockStatus: 'In Stock'
     });
     setShowProductForm(true);
@@ -2884,8 +3263,16 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
 
       const autoStatus = computedStock === 0 ? 'Out of Stock' : computedStock <= 10 ? 'Low Stock' : (productFormData.stockStatus || 'In Stock');
 
+      const rawImages = (productFormData.images || []).filter(Boolean);
+      let mainImage = productFormData.image || rawImages[0] || '';
+      if (mainImage && !rawImages.includes(mainImage)) {
+        rawImages.unshift(mainImage);
+      }
+
       const dataToSave = {
         ...productFormData,
+        image: mainImage,
+        images: rawImages,
         stock: computedStock,
         stockStatus: autoStatus,
         sizes: parsedSizes,
@@ -2910,10 +3297,11 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
         price: 0, 
         originalPrice: 0, 
         image: '', 
+        images: [],
         fabric: '', 
         fit: '', 
         description: '', 
-        sizes: '30, 32, 34, 36, 38',
+        sizes: '28, 30, 32, 34, 36, 38, 40',
         colors: 'Black, Navy, Grey',
         stockMap: {},
         stock: 100,
@@ -2949,7 +3337,7 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
   };
 
   const startEdit = (product: Product) => {
-    const pSizes = parseProductSizes(product.sizes);
+    const pSizes = parseProductSizes(product.sizes, product.category, product.name);
     const pColors = parseProductColors(product.colors);
     
     const baseMap = product.stockMap ? JSON.parse(JSON.stringify(product.stockMap)) : {};
@@ -2962,13 +3350,31 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
       });
     });
 
+    let initImages: string[] = [];
+    if (product.images) {
+      if (Array.isArray(product.images)) {
+        initImages = product.images.filter(Boolean);
+      } else if (typeof product.images === 'string') {
+        try {
+          const parsed = JSON.parse(product.images);
+          initImages = Array.isArray(parsed) ? parsed.filter(Boolean) : [product.images];
+        } catch {
+          initImages = [product.images];
+        }
+      }
+    }
+    if (product.image && !initImages.includes(product.image)) {
+      initImages = [product.image, ...initImages];
+    }
+
     setEditingProduct(product);
     setProductFormData({
       name: product.name,
       category: product.category || 'Formal Pant',
       price: product.price,
       originalPrice: product.originalPrice,
-      image: product.image,
+      image: product.image || (initImages[0] || ''),
+      images: initImages,
       fabric: product.fabric || '',
       fit: product.fit || '',
       description: product.description || '',
@@ -2982,8 +3388,8 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'product' | 'banner' | 'banner_mobile' | 'top_rated_offer' | 'hero_image' = 'product') => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
     setIsUploading(true);
     try {
@@ -3027,22 +3433,38 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
         });
       };
 
-      const url = await compressImage(file);
-      
       if (type === 'product') {
-        setProductFormData(prev => ({ ...prev, image: url }));
-      } else if (type === 'banner') {
-        setBannerFormData(prev => ({ ...prev, image: url }));
-      } else if (type === 'banner_mobile') {
-        setBannerFormData(prev => ({ ...prev, mobile_image: url }));
-      } else if (type === 'top_rated_offer') {
-        setTopRatedOfferImage(url);
-        await setDoc(doc(db, 'settings', 'top_rated_offer_image'), { value: url });
-        onRefreshPromoImage();
-      } else if (type === 'hero_image') {
-        setHeroImage(url);
-        await setDoc(doc(db, 'settings', 'hero_image'), { value: url });
-        onRefreshHeroImage();
+        const uploadedUrls: string[] = [];
+        for (let i = 0; i < files.length; i++) {
+          const url = await compressImage(files[i]);
+          uploadedUrls.push(url);
+        }
+        setProductFormData(prev => {
+          const existingImages = Array.isArray(prev.images) ? [...prev.images] : (prev.image ? [prev.image] : []);
+          const combined = [...existingImages, ...uploadedUrls];
+          const mainImage = prev.image ? prev.image : (combined[0] || '');
+          return {
+            ...prev,
+            image: mainImage,
+            images: combined
+          };
+        });
+      } else {
+        const file = files[0];
+        const url = await compressImage(file);
+        if (type === 'banner') {
+          setBannerFormData(prev => ({ ...prev, image: url }));
+        } else if (type === 'banner_mobile') {
+          setBannerFormData(prev => ({ ...prev, mobile_image: url }));
+        } else if (type === 'top_rated_offer') {
+          setTopRatedOfferImage(url);
+          await setDoc(doc(db, 'settings', 'top_rated_offer_image'), { value: url });
+          onRefreshPromoImage();
+        } else if (type === 'hero_image') {
+          setHeroImage(url);
+          await setDoc(doc(db, 'settings', 'hero_image'), { value: url });
+          onRefreshHeroImage();
+        }
       }
     } catch (err) {
       console.error('Upload failed:', err);
@@ -3348,14 +3770,1056 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
     );
   }
 
+const initialDefaultAccounts = [
+  {
+    id: 'acc-1',
+    name: 'OFFICE CASH',
+    subtitle: 'OFFICE CASH',
+    accountNumber: '',
+    type: 'cash',
+    balance: 0,
+    currency: 'BDT',
+    isUSD: false,
+    color: '#10b981'
+  },
+  {
+    id: 'acc-2',
+    name: 'SONALI BANK',
+    subtitle: '4213509000104',
+    accountNumber: '4213509000104',
+    type: 'bank',
+    balance: 0,
+    currency: 'BDT',
+    isUSD: false,
+    color: '#fbbf24'
+  },
+  {
+    id: 'acc-3',
+    name: 'BKASH',
+    subtitle: '01619835133',
+    accountNumber: '01619835133',
+    type: 'bkash',
+    balance: 0,
+    currency: 'BDT',
+    isUSD: false,
+    color: '#ec4899'
+  },
+  {
+    id: 'acc-4',
+    name: 'NAGAD',
+    subtitle: '01704950392',
+    accountNumber: '01704950392',
+    type: 'nagad',
+    balance: 0,
+    currency: 'BDT',
+    isUSD: false,
+    color: '#ef4444'
+  },
+  {
+    id: 'acc-5',
+    name: 'VISA CARD',
+    subtitle: '4937242026056877',
+    accountNumber: '4937242026056877',
+    type: 'visa',
+    balance: 0,
+    currency: 'USD',
+    isUSD: true,
+    color: '#3b82f6'
+  }
+];
+
+const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'success' | 'error' | 'info') => void }) => {
+  // Accounts state - initial 0 balance
+  const [accounts, setAccounts] = useState<any[]>(() => {
+    const saved = localStorage.getItem('elegan_finance_accounts');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        console.error('Error loading finance accounts:', e);
+      }
+    }
+    return initialDefaultAccounts;
+  });
+
+  // Transactions state - initial empty
+  const [transactions, setTransactions] = useState<any[]>(() => {
+    const saved = localStorage.getItem('elegan_finance_transactions');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        console.error('Error loading finance transactions:', e);
+      }
+    }
+    return [];
+  });
+
+  // Load from Supabase if available
+  useEffect(() => {
+    async function loadFromSupabase() {
+      const supaAccs = await fetchFinanceAccountsFromSupabase();
+      if (supaAccs && supaAccs.length > 0) {
+        setAccounts(supaAccs);
+        localStorage.setItem('elegan_finance_accounts', JSON.stringify(supaAccs));
+      }
+      const supaTxs = await fetchFinanceTransactionsFromSupabase();
+      if (supaTxs) {
+        setTransactions(supaTxs);
+        localStorage.setItem('elegan_finance_transactions', JSON.stringify(supaTxs));
+      }
+    }
+    loadFromSupabase();
+  }, []);
+
+  // Save Accounts helper
+  const updateAccountsState = (newAccs: any[]) => {
+    setAccounts(newAccs);
+    localStorage.setItem('elegan_finance_accounts', JSON.stringify(newAccs));
+    saveFinanceAccountsToSupabase(newAccs);
+  };
+
+  // Save Transactions helper
+  const updateTransactionsState = (newTxs: any[], newTxToSave?: any) => {
+    setTransactions(newTxs);
+    localStorage.setItem('elegan_finance_transactions', JSON.stringify(newTxs));
+    if (newTxToSave) {
+      saveFinanceTransactionToSupabase(newTxToSave);
+    }
+  };
+
+  // Reset all finance data to 0
+  const handleResetAllToZero = () => {
+    if (window.confirm('আপনি কি নিশ্চিত যে সকল হিসাবের ব্যালেন্স 0 করবেন এবং নতুন ডেটা যুক্ত করবেন?')) {
+      const zeroAccs = accounts.map(a => ({ ...a, balance: 0 }));
+      updateAccountsState(zeroAccs);
+      updateTransactionsState([]);
+      showToast('সকল অ্যাকাউন্ট ব্যালেন্স 0 করা হয়েছে! নতুন এন্ট্রি করুন।', 'info');
+    }
+  };
+
+  // Form State
+  const [selectedAccount, setSelectedAccount] = useState('acc-1');
+  const [txType, setTxType] = useState<'income' | 'expense' | 'transfer'>('income');
+  const [amount, setAmount] = useState('');
+  const [txDate, setTxDate] = useState('2026-09-19');
+  const [status, setStatus] = useState<'paid' | 'unpaid'>('paid');
+  const [description, setDescription] = useState('');
+  const [reference, setReference] = useState('');
+  const [fileAttachment, setFileAttachment] = useState<File | null>(null);
+
+  // Time Filter State
+  const [timeFilter, setTimeFilter] = useState('all');
+
+  // Delete Transaction Modal State
+  const [deletingTx, setDeletingTx] = useState<any | null>(null);
+
+  // Toggle Transaction Status (Paid <-> Unpaid)
+  const handleToggleTxStatus = (tx: any) => {
+    const newStatus: 'paid' | 'unpaid' = tx.status === 'paid' ? 'unpaid' : 'paid';
+
+    // Update Transaction
+    const updatedTxs = transactions.map(t => {
+      if (t.id === tx.id) {
+        return { ...t, status: newStatus };
+      }
+      return t;
+    });
+
+    // Adjust Account balance
+    const updatedAccs = accounts.map(a => {
+      if (a.id === tx.accountId) {
+        let balanceChange = 0;
+        if (tx.status === 'paid' && newStatus === 'unpaid') {
+          // Revert paid status
+          balanceChange = tx.type === 'income' ? -tx.amount : (tx.type === 'expense' ? tx.amount : 0);
+        } else if (tx.status === 'unpaid' && newStatus === 'paid') {
+          // Apply paid status
+          balanceChange = tx.type === 'income' ? tx.amount : (tx.type === 'expense' ? -tx.amount : 0);
+        }
+        return { ...a, balance: a.balance + balanceChange };
+      }
+      return a;
+    });
+
+    updateAccountsState(updatedAccs);
+    updateTransactionsState(updatedTxs);
+    updateFinanceTransactionStatusInSupabase(tx.id, newStatus);
+    showToast(`স্ট্যাটাস পরিবর্তন করা হয়েছে: ${newStatus.toUpperCase()}`, 'success');
+  };
+
+  // Confirm Delete Transaction
+  const handleConfirmDeleteTx = () => {
+    if (!deletingTx) return;
+
+    // If deleting a PAID transaction, revert account balance
+    let updatedAccs = accounts;
+    if (deletingTx.status === 'paid') {
+      updatedAccs = accounts.map(a => {
+        if (a.id === deletingTx.accountId) {
+          const balanceChange = deletingTx.type === 'income' ? -deletingTx.amount : (deletingTx.type === 'expense' ? deletingTx.amount : 0);
+          return { ...a, balance: a.balance + balanceChange };
+        }
+        return a;
+      });
+      updateAccountsState(updatedAccs);
+    }
+
+    const updatedTxs = transactions.filter(t => t.id !== deletingTx.id);
+    updateTransactionsState(updatedTxs);
+    deleteFinanceTransactionFromSupabase(deletingTx.id);
+
+    showToast('লেনদেনটি সফলভাবে মুছে ফেলা হয়েছে!', 'info');
+    setDeletingTx(null);
+  };
+
+  // Account Modal State
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
+  const [accountFormData, setAccountFormData] = useState({
+    name: '',
+    subtitle: '',
+    accountNumber: '',
+    balance: '',
+    isUSD: false
+  });
+
+  // Calculate Summary metrics
+  const totalPaidIncome = transactions
+    .filter(t => t.type === 'income' && t.status === 'paid' && t.currency === 'BDT')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const totalPaidExpense = transactions
+    .filter(t => t.type === 'expense' && t.status === 'paid' && t.currency === 'BDT')
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const netBalanceBDT = totalPaidIncome - totalPaidExpense;
+
+  const usdBalance = accounts
+    .filter(a => a.isUSD)
+    .reduce((sum, a) => sum + a.balance, 0);
+
+  const unpaidTransactions = transactions.filter(t => t.status === 'unpaid');
+  const unpaidTotal = unpaidTransactions.reduce((sum, t) => sum + t.amount, 0);
+  const totalCount = transactions.length;
+
+  // Handle New Transaction Submit
+  const handleSaveTransaction = (e: React.FormEvent) => {
+    e.preventDefault();
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      showToast('অনুগ্রহ করে সঠিক পরিমাণ লিখুন', 'error');
+      return;
+    }
+
+    const acc = accounts.find(a => a.id === selectedAccount);
+    if (!acc) return;
+
+    const newTx = {
+      id: `tx-${Date.now()}`,
+      accountId: acc.id,
+      accountName: acc.name,
+      type: txType,
+      amount: numAmount,
+      date: txDate,
+      status,
+      description: description || (txType === 'income' ? 'নতুন আয়' : 'নতুন খরচ'),
+      reference: reference || `REF-${Math.floor(1000 + Math.random() * 9000)}`,
+      currency: acc.currency
+    };
+
+    const newTxs = [newTx, ...transactions];
+
+    // Update Account balance if Paid
+    let newAccs = accounts;
+    if (status === 'paid') {
+      newAccs = accounts.map(a => {
+        if (a.id === acc.id) {
+          const delta = txType === 'income' ? numAmount : (txType === 'expense' ? -numAmount : 0);
+          return { ...a, balance: a.balance + delta };
+        }
+        return a;
+      });
+    }
+
+    updateAccountsState(newAccs);
+    updateTransactionsState(newTxs, newTx);
+
+    // Reset Form
+    setAmount('');
+    setDescription('');
+    setReference('');
+    setFileAttachment(null);
+    showToast('লেনদেন সফলভাবে সংরক্ষণ করা হয়েছে এবং Supabase এ সেভ হয়েছে!', 'success');
+  };
+
+  const handleResetForm = () => {
+    setAmount('');
+    setDescription('');
+    setReference('');
+    setStatus('paid');
+    setTxType('income');
+    setFileAttachment(null);
+  };
+
+  // Handle Account Edit / Delete
+  const handleEditAccount = (acc: any) => {
+    setEditingAccountId(acc.id);
+    setAccountFormData({
+      name: acc.name,
+      subtitle: acc.subtitle,
+      accountNumber: acc.accountNumber,
+      balance: acc.balance.toString(),
+      isUSD: acc.isUSD
+    });
+    setIsAccountModalOpen(true);
+  };
+
+  const handleDeleteAccount = (id: string) => {
+    if (accounts.length <= 1) {
+      showToast('সর্বনিম্ন একটি অ্যাকাউন্ট থাকা আবশ্যক', 'error');
+      return;
+    }
+    const updated = accounts.filter(a => a.id !== id);
+    updateAccountsState(updated);
+    showToast('অ্যাকাউন্টটি মুছে ফেলা হয়েছে', 'info');
+  };
+
+  const handleSaveAccountModal = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!accountFormData.name) return;
+
+    let updatedAccs = [...accounts];
+    if (editingAccountId) {
+      updatedAccs = accounts.map(a => {
+        if (a.id === editingAccountId) {
+          return {
+            ...a,
+            name: accountFormData.name.toUpperCase(),
+            subtitle: accountFormData.subtitle || accountFormData.accountNumber || accountFormData.name,
+            accountNumber: accountFormData.accountNumber,
+            balance: parseFloat(accountFormData.balance) || a.balance,
+            isUSD: accountFormData.isUSD,
+            currency: accountFormData.isUSD ? 'USD' : 'BDT'
+          };
+        }
+        return a;
+      });
+      showToast('অ্যাকাউন্ট আপডেট করা হয়েছে', 'success');
+    } else {
+      const newAcc = {
+        id: `acc-${Date.now()}`,
+        name: accountFormData.name.toUpperCase(),
+        subtitle: accountFormData.subtitle || accountFormData.accountNumber || accountFormData.name,
+        accountNumber: accountFormData.accountNumber,
+        type: accountFormData.isUSD ? 'visa' : 'bank',
+        balance: parseFloat(accountFormData.balance) || 0,
+        currency: accountFormData.isUSD ? 'USD' : 'BDT',
+        isUSD: accountFormData.isUSD,
+        color: '#3b82f6'
+      };
+      updatedAccs = [...accounts, newAcc];
+      showToast('নতুন অ্যাকাউন্ট যুক্ত করা হয়েছে', 'success');
+    }
+    updateAccountsState(updatedAccs);
+    setIsAccountModalOpen(false);
+    setEditingAccountId(null);
+  };
+
+  // Donut chart total sum
+  const totalAccountBalanceSum = accounts
+    .filter(a => !a.isUSD)
+    .reduce((sum, a) => sum + a.balance, 0) || 1;
+
+  return (
+    <div className="space-y-6 text-zinc-900 font-sans">
+      
+      {/* 1. TOP HEADER & ACCOUNTS ROW */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 className="text-xl font-serif font-bold text-zinc-900">Finance & Accounts</h3>
+          <p className="text-xs text-zinc-500 mt-1">আয়, ব্যয়, একাউন্ট ব্যালেন্স এবং নগদ আর্থিক হিসাব ব্যবস্থাপনা</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleResetAllToZero}
+            className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+            title="সকল ব্যালেন্স 0 করুন"
+          >
+            <RefreshCw size={12} />
+            <span>সকল ব্যালেন্স 0 করুন</span>
+          </button>
+          <button
+            onClick={() => {
+              setEditingAccountId(null);
+              setAccountFormData({ name: '', subtitle: '', accountNumber: '', balance: '0', isUSD: false });
+              setIsAccountModalOpen(true);
+            }}
+            className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+          >
+            <Plus size={14} />
+            <span>+ নতুন অ্যাকাউন্ট</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+        {accounts.map((acc) => (
+          <div 
+            key={acc.id}
+            className="bg-white border border-zinc-100 rounded-xl p-4 flex flex-col justify-between shadow-sm hover:border-zinc-300 transition-all relative group"
+          >
+            {/* Top row: USD Badge + Edit/Delete */}
+            <div className="flex justify-between items-start mb-2">
+              <div>
+                {acc.isUSD && (
+                  <span className="inline-block bg-red-50 text-red-600 border border-red-100 px-2 py-0.5 rounded-full text-[9px] font-bold tracking-wider">
+                    $ USD অ্যাকাউন্ট
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                <button 
+                  onClick={() => handleEditAccount(acc)}
+                  className="p-1 text-zinc-400 hover:text-zinc-800 hover:bg-zinc-100 rounded-md transition-colors cursor-pointer"
+                  title="Edit Account"
+                >
+                  <Edit2 size={12} />
+                </button>
+                <button 
+                  onClick={() => handleDeleteAccount(acc.id)}
+                  className="p-1 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                  title="Delete Account"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            </div>
+
+            {/* Center: Icon & Title */}
+            <div className="flex flex-col items-center text-center my-1">
+              <div className="w-11 h-11 bg-zinc-50 rounded-xl p-1.5 flex items-center justify-center mb-2 border border-zinc-100">
+                {acc.type === 'cash' && (
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                    💵
+                  </div>
+                )}
+                {acc.type === 'bank' && (
+                  <div className="w-8 h-8 rounded-lg bg-amber-400 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                    ☀️
+                  </div>
+                )}
+                {acc.type === 'bkash' && (
+                  <img src="https://i.postimg.cc/FNktNhrf/1656234782bkash-app-logo.png" alt="bKash" className="w-8 h-8 object-contain rounded-lg" />
+                )}
+                {acc.type === 'nagad' && (
+                  <img src="https://i.postimg.cc/Dv0j6cmq/images.png" alt="Nagad" className="w-8 h-8 object-contain rounded-lg" />
+                )}
+                {acc.type === 'visa' && (
+                  <div className="w-8 h-8 rounded-lg bg-red-600 text-white flex items-center justify-center font-bold text-xs tracking-tighter">
+                    P
+                  </div>
+                )}
+              </div>
+
+              <h4 className="text-xs font-bold text-zinc-900 tracking-tight uppercase">{acc.name}</h4>
+              <p className="text-[10px] text-zinc-400 font-medium truncate max-w-[130px]">{acc.subtitle}</p>
+            </div>
+
+            {/* Bottom: Balance & Arrow badge */}
+            <div className="pt-2.5 border-t border-zinc-100 flex items-end justify-between mt-2">
+              <div>
+                <p className="text-[10px] text-zinc-400 font-bold">
+                  {acc.isUSD ? 'ডলার ব্যালেন্স (USD)' : 'ব্যালেন্স'}
+                </p>
+                <p className="text-sm font-bold text-emerald-600 font-sans tracking-tight mt-0.5">
+                  {acc.isUSD ? `$${acc.balance.toFixed(2)}` : `৳${acc.balance.toLocaleString()}`}
+                </p>
+              </div>
+
+              <div className="w-6 h-6 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center shrink-0">
+                {acc.isUSD ? <span className="text-[10px] font-bold text-red-500">$</span> : <ArrowUpRight size={13} />}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+
+      {/* 2. SUMMARY BAR (`সারসংক্ষেপ (নির্বাচিত সময়)`) */}
+      <div className="bg-white border border-zinc-100 rounded-xl p-5 sm:p-6 shadow-sm">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2">
+          <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-500">
+            সারসংক্ষেপ (নির্বাচিত সময়)
+          </h4>
+
+          <div className="relative">
+            <select
+              value={timeFilter}
+              onChange={(e) => setTimeFilter(e.target.value)}
+              className="bg-white border border-zinc-200 text-zinc-700 text-xs font-medium py-1.5 px-3 pr-8 rounded-lg appearance-none focus:outline-none focus:border-zinc-900 cursor-pointer shadow-xs"
+            >
+              <option value="all">সব সময়</option>
+              <option value="today">আজকের দিন</option>
+              <option value="this_week">এই সপ্তাহ</option>
+              <option value="this_month">এই মাস</option>
+            </select>
+            <ChevronDown size={14} className="absolute right-2.5 top-2.5 text-zinc-400 pointer-events-none" />
+          </div>
+        </div>
+
+        {/* 6 Metric Boxes Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {/* Box 1 */}
+          <div className="bg-zinc-50 hover:bg-zinc-100/70 p-4 rounded-xl border border-zinc-100 transition-colors">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">মোট ইনকাম (PAID)</p>
+            <p className="text-base font-bold text-emerald-600 mt-1.5 font-sans">
+              ৳{totalPaidIncome.toLocaleString()}
+            </p>
+          </div>
+
+          {/* Box 2 */}
+          <div className="bg-zinc-50 hover:bg-zinc-100/70 p-4 rounded-xl border border-zinc-100 transition-colors">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-red-600">মোট খরচ (PAID)</p>
+            <p className="text-base font-bold text-red-600 mt-1.5 font-sans">
+              ৳{totalPaidExpense.toLocaleString()}
+            </p>
+          </div>
+
+          {/* Box 3 */}
+          <div className="bg-zinc-50 hover:bg-zinc-100/70 p-4 rounded-xl border border-zinc-100 transition-colors">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-600">নেট ব্যালেন্স (টাকা)</p>
+            <p className="text-base font-bold text-indigo-600 mt-1.5 font-sans">
+              ৳{netBalanceBDT.toLocaleString()}
+            </p>
+          </div>
+
+          {/* Box 4 */}
+          <div className="bg-zinc-50 hover:bg-zinc-100/70 p-4 rounded-xl border border-zinc-100 transition-colors">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-teal-600">ডলার ব্যালেন্স (USD)</p>
+            <p className="text-base font-bold text-teal-600 mt-1.5 font-sans">
+              ${usdBalance.toFixed(2)}
+            </p>
+          </div>
+
+          {/* Box 5 */}
+          <div className="bg-zinc-50 hover:bg-zinc-100/70 p-4 rounded-xl border border-zinc-100 transition-colors">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-orange-600">বকেয়া (UNPAID)</p>
+            <p className="text-base font-bold text-orange-600 mt-1.5 font-sans">
+              ৳{unpaidTotal.toLocaleString()}
+            </p>
+            <p className="text-[9px] text-orange-500 font-semibold mt-0.5">{unpaidTransactions.length} টি লেনদেন</p>
+          </div>
+
+          {/* Box 6 */}
+          <div className="bg-zinc-50 hover:bg-zinc-100/70 p-4 rounded-xl border border-zinc-100 transition-colors">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">মোট লেনদেন</p>
+            <p className="text-base font-bold text-zinc-900 mt-1.5 font-sans">
+              {totalCount} টি
+            </p>
+          </div>
+        </div>
+      </div>
+
+
+      {/* 3. LOWER ROW: NEW TRANSACTION FORM + ACCOUNT DONUT CHART */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* LEFT COLUMN (2 Cols wide) - ADD NEW TRANSACTION FORM */}
+        <div className="lg:col-span-2 bg-white border border-zinc-100 rounded-xl p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            {/* Header & Green Badge */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 pb-4 border-b border-zinc-100 gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-zinc-900 tracking-tight flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">+</span>
+                  <span>নতুন লেনদেন এন্ট্রি করুন</span>
+                </h3>
+                <p className="text-xs text-zinc-500 mt-1">
+                  ম্যানুয়ালি নতুন আয়, খরচ, ডিপোজিট অথবা ট্রান্সফার এন্ট্রি করুন (ডিফল্ট পেইড)
+                </p>
+              </div>
+
+              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold shrink-0">
+                <CheckCircle2 size={13} />
+                <span>Paid এন্ট্রি সাথে সাথে অ্যাকাউন্ট ব্যালেন্সে যোগ হবে</span>
+              </span>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSaveTransaction} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Account Select */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">হিসাব নির্বাচন করুন *</label>
+                  <select
+                    required
+                    value={selectedAccount}
+                    onChange={(e) => setSelectedAccount(e.target.value)}
+                    className="w-full bg-white border border-zinc-200 rounded-lg p-2.5 text-xs text-zinc-800 font-medium focus:outline-none focus:border-zinc-900 transition-colors"
+                  >
+                    {accounts.map(acc => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.name} ({acc.isUSD ? `$${acc.balance}` : `৳${acc.balance.toLocaleString()}`})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Transaction Type */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">লেনদেন ধরন *</label>
+                  <select
+                    required
+                    value={txType}
+                    onChange={(e) => setTxType(e.target.value as any)}
+                    className="w-full bg-white border border-zinc-200 rounded-lg p-2.5 text-xs text-zinc-800 font-medium focus:outline-none focus:border-zinc-900 transition-colors"
+                  >
+                    <option value="income">ইনকাম / ডিপোজিট (Income / Deposit)</option>
+                    <option value="expense">খরচ (Expense)</option>
+                    <option value="transfer">ট্রান্সফার (Transfer)</option>
+                  </select>
+                </div>
+
+                {/* Amount */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">পরিমাণ (৳) *</label>
+                  <input
+                    type="number"
+                    step="any"
+                    required
+                    placeholder="0.00 (৳)"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="w-full bg-white border border-zinc-200 rounded-lg p-2.5 text-xs text-zinc-800 font-medium focus:outline-none focus:border-zinc-900 transition-colors"
+                  />
+                </div>
+
+                {/* Date */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">তারিখ *</label>
+                  <input
+                    type="date"
+                    required
+                    value={txDate}
+                    onChange={(e) => setTxDate(e.target.value)}
+                    className="w-full bg-white border border-zinc-200 rounded-lg p-2.5 text-xs text-zinc-800 font-medium focus:outline-none focus:border-zinc-900 transition-colors"
+                  />
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">স্ট্যাটাস *</label>
+                  <select
+                    required
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value as any)}
+                    className="w-full bg-white border border-zinc-200 rounded-lg p-2.5 text-xs text-zinc-800 font-medium focus:outline-none focus:border-zinc-900 transition-colors"
+                  >
+                    <option value="paid">✓ Paid (পরিশোধিত - অ্যাকাউন্টে যোগ)</option>
+                    <option value="unpaid">Unpaid (বকেয়া)</option>
+                  </select>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">বিবরণ (ঐচ্ছিক)</label>
+                  <input
+                    type="text"
+                    placeholder="বিবরণ লিখুন"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full bg-white border border-zinc-200 rounded-lg p-2.5 text-xs text-zinc-800 font-medium focus:outline-none focus:border-zinc-900 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Invoice/Reference */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">রেফারেন্স / ইনভয়েস আইডি (ঐচ্ছিক)</label>
+                <input
+                  type="text"
+                  placeholder="রেফারেন্স বা ইনভয়েস আইডি (ঐচ্ছিক)"
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                  className="w-full bg-white border border-zinc-200 rounded-lg p-2.5 text-xs text-zinc-800 font-medium focus:outline-none focus:border-zinc-900 transition-colors"
+                />
+              </div>
+
+              {/* Attachment File upload */}
+              <div>
+                <div className="w-full bg-zinc-50 border border-dashed border-zinc-200 rounded-lg p-3 text-center cursor-pointer hover:bg-zinc-100 transition-colors relative">
+                  <input 
+                    type="file" 
+                    onChange={(e) => setFileAttachment(e.target.files?.[0] || null)}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                  />
+                  <p className="text-xs text-zinc-500 font-medium">
+                    📄 {fileAttachment ? fileAttachment.name : 'প্রমাণপত্র / রসিদ আপলোড (ঐচ্ছিক) • ক্লিক করে ফাইল নির্বাচন করুন'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleResetForm}
+                  className="px-4 py-2 border border-zinc-200 bg-white hover:bg-zinc-50 rounded-lg text-xs font-bold text-zinc-700 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RefreshCw size={12} />
+                  <span>রিসেট</span>
+                </button>
+
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <Check size={14} />
+                  <span>সংরক্ষণ করুন</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+
+        {/* RIGHT COLUMN - ACCOUNT WISE TRANSACTIONS DONUT CHART */}
+        <div className="bg-white border border-zinc-100 rounded-xl p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-4">
+              হিসাব ভিত্তিক লেনদেন
+            </h3>
+
+            {/* Donut Chart */}
+            <div className="flex flex-col items-center justify-center my-3">
+              <div className="relative w-40 h-40 flex items-center justify-center">
+                {/* SVG Donut */}
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                  {/* Background track */}
+                  <path
+                    className="text-zinc-100"
+                    strokeWidth="3.8"
+                    stroke="currentColor"
+                    fill="none"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                  
+                  {/* OFFICE CASH Segment (57%) */}
+                  <path
+                    className="text-emerald-500"
+                    strokeDasharray="57, 100"
+                    strokeWidth="4"
+                    stroke="currentColor"
+                    fill="none"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+
+                  {/* SONALI BANK Segment (42%) */}
+                  <path
+                    className="text-amber-400"
+                    strokeDasharray="42, 100"
+                    strokeDashoffset="-57"
+                    strokeWidth="4"
+                    stroke="currentColor"
+                    fill="none"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+
+                  {/* BKASH Segment (1%) */}
+                  <path
+                    className="text-pink-500"
+                    strokeDasharray="1, 100"
+                    strokeDashoffset="-99"
+                    strokeWidth="4"
+                    stroke="currentColor"
+                    fill="none"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                  />
+                </svg>
+
+                {/* Center text inside donut */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+                  <span className="text-2xl font-bold text-zinc-900 leading-none">{totalCount}</span>
+                  <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest mt-1">মোট লেনদেন</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Legend Breakdown */}
+            <div className="space-y-2 mt-4 pt-4 border-t border-zinc-100">
+              {accounts.map(acc => {
+                const percent = acc.isUSD 
+                  ? '0%' 
+                  : `${Math.round((acc.balance / totalAccountBalanceSum) * 100)}%`;
+                
+                return (
+                  <div key={acc.id} className="flex items-center justify-between text-xs font-medium">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: acc.color }} />
+                      <span className="text-zinc-600 uppercase tracking-tight">{acc.name}</span>
+                    </div>
+                    <span className="text-zinc-900 font-sans font-bold">
+                      {acc.isUSD ? `$${acc.balance.toFixed(2)}` : `৳${acc.balance.toLocaleString()}`} ({percent})
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+
+      {/* 4. RECENT TRANSACTIONS TABLE */}
+      <div className="bg-white border border-zinc-100 rounded-xl shadow-sm overflow-hidden">
+        <div className="p-5 sm:p-6 border-b border-zinc-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-zinc-900 tracking-tight">
+              সাম্প্রতিক লেনদেন ইতিহাস (Recent Transactions)
+            </h3>
+            <p className="text-xs text-zinc-400 mt-0.5">সবশেষ আয়, ব্যয় এবং লেনদেন রেকর্ড</p>
+          </div>
+          <span className="text-xs text-zinc-400 font-medium px-2.5 py-1 bg-zinc-50 border border-zinc-100 rounded-lg">
+            {transactions.length} Records
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          {transactions.length === 0 ? (
+            <div className="text-center py-12 bg-white">
+              <p className="text-xs text-zinc-400 font-medium">কোন লেনদেনের ইতিহাস পাওয়া যায়নি।</p>
+              <p className="text-[11px] text-zinc-400 mt-1">উপরের ফর্ম থেকে নতুন লেনদেন এন্ট্রি করুন।</p>
+            </div>
+          ) : (
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="bg-zinc-50/70 border-b border-zinc-100 text-zinc-400 font-bold uppercase text-[10px] tracking-wider">
+                  <th className="py-3.5 px-5">তারিখ</th>
+                  <th className="py-3.5 px-5">অ্যাকাউন্ট</th>
+                  <th className="py-3.5 px-5">ধরন</th>
+                  <th className="py-3.5 px-5">বিবরণ / রেফারেন্স</th>
+                  <th className="py-3.5 px-5">স্ট্যাটাস</th>
+                  <th className="py-3.5 px-5 text-right">পরিমাণ</th>
+                  <th className="py-3.5 px-5 text-right">অ্যাকশন</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100 font-medium">
+                {transactions.map(tx => (
+                  <tr key={tx.id} className="hover:bg-zinc-50/50 transition-colors">
+                    <td className="py-3 px-5 text-zinc-600 font-sans text-xs">{tx.date}</td>
+                    <td className="py-3 px-5 text-zinc-900 uppercase font-bold text-xs">{tx.accountName}</td>
+                    <td className="py-3 px-5">
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
+                        tx.type === 'income' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'
+                      }`}>
+                        {tx.type === 'income' ? 'ইনকাম' : 'খরচ'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-5 text-zinc-600">
+                      <p className="text-zinc-900 font-medium text-xs">{tx.description}</p>
+                      {tx.reference && <p className="text-[10px] text-zinc-400 font-sans mt-0.5">{tx.reference}</p>}
+                    </td>
+                    <td className="py-3 px-5">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleTxStatus(tx)}
+                        className={`px-3 py-1 rounded-full text-[10px] font-bold tracking-wide flex items-center gap-1.5 cursor-pointer transition-all hover:opacity-80 border ${
+                          tx.status === 'paid'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-2xs'
+                            : 'bg-orange-50 text-orange-700 border-orange-200 shadow-2xs'
+                        }`}
+                        title="ক্লিক করে Paid / Unpaid পরিবর্তন করুন"
+                      >
+                        <RefreshCw size={10} />
+                        <span>{tx.status === 'paid' ? '✓ Paid' : '⏳ Unpaid'}</span>
+                      </button>
+                    </td>
+                    <td className={`py-3 px-5 text-right font-sans font-bold text-xs ${
+                      tx.type === 'income' ? 'text-emerald-600' : 'text-red-600'
+                    }`}>
+                      {tx.type === 'income' ? '+' : '-'}{tx.currency === 'USD' ? `$${tx.amount}` : `৳${tx.amount.toLocaleString()}`}
+                    </td>
+                    <td className="py-3 px-5 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setDeletingTx(tx)}
+                        className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1"
+                        title="লেনদেনটি ডিলিট করুন"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {/* DELETE TRANSACTION CONFIRMATION MODAL */}
+      {deletingTx && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl relative border border-zinc-200 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-red-50 border border-red-100 text-red-600 flex items-center justify-center mx-auto mb-3 shadow-2xs">
+              <Trash2 size={22} />
+            </div>
+
+            <h3 className="text-base font-bold text-zinc-900 mb-1">
+              লেনদেন ডিলিট নিশ্চিতকরণ
+            </h3>
+            <p className="text-xs text-zinc-500 font-medium mb-4">
+              আপনি কি নিশ্চিত যে এই লেনদেনটি Supabase ডাটাবেস এবং সিস্টেম থেকে মুছে ফেলতে চান?
+            </p>
+
+            <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200/80 mb-5 text-left text-xs font-bold space-y-1">
+              <div className="flex justify-between text-zinc-600">
+                <span>অ্যাকাউন্ট:</span>
+                <span className="text-zinc-900 uppercase">{deletingTx.accountName}</span>
+              </div>
+              <div className="flex justify-between text-zinc-600">
+                <span>বিবরণ:</span>
+                <span className="text-zinc-900">{deletingTx.description}</span>
+              </div>
+              <div className="flex justify-between text-zinc-600">
+                <span>পরিমাণ:</span>
+                <span className={deletingTx.type === 'income' ? 'text-emerald-600 font-sans' : 'text-red-600 font-sans'}>
+                  {deletingTx.type === 'income' ? '+' : '-'}{deletingTx.currency === 'USD' ? `$${deletingTx.amount}` : `৳${deletingTx.amount.toLocaleString()}`}
+                </span>
+              </div>
+              <div className="flex justify-between text-zinc-600">
+                <span>স্ট্যাটাস:</span>
+                <span className={deletingTx.status === 'paid' ? 'text-emerald-600 uppercase' : 'text-orange-600 uppercase'}>
+                  {deletingTx.status}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setDeletingTx(null)}
+                className="w-1/2 py-2.5 border border-zinc-200 hover:bg-zinc-50 rounded-xl text-xs font-bold text-zinc-700 transition-all cursor-pointer"
+              >
+                বাতিল করুন
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteTx}
+                className="w-1/2 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+              >
+                হ্যাঁ, মুছে ফেলুন
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* ACCOUNT MODAL */}
+      {isAccountModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative border border-zinc-200">
+            <button
+              onClick={() => setIsAccountModalOpen(false)}
+              className="absolute top-4 right-4 p-1.5 text-zinc-400 hover:text-zinc-800 rounded-lg cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+
+            <h3 className="text-base font-serif font-bold text-zinc-900 mb-4">
+              {editingAccountId ? 'অ্যাকাউন্ট এডিট করুন' : 'নতুন অ্যাকাউন্ট যোগ করুন'}
+            </h3>
+
+            <form onSubmit={handleSaveAccountModal} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-zinc-600 mb-1">অ্যাকাউন্ট নাম *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. ISLAMI BANK / CASH"
+                  value={accountFormData.name}
+                  onChange={(e) => setAccountFormData({ ...accountFormData, name: e.target.value })}
+                  className="w-full bg-zinc-50 border border-zinc-200 rounded-xl p-2.5 text-xs font-bold text-zinc-800 focus:outline-none focus:border-zinc-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-600 mb-1">সাবটাইটেল / অ্যাকাউন্ট নম্বর</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 2050123456789"
+                  value={accountFormData.accountNumber}
+                  onChange={(e) => setAccountFormData({ ...accountFormData, accountNumber: e.target.value })}
+                  className="w-full bg-zinc-50 border border-zinc-200 rounded-xl p-2.5 text-xs font-bold text-zinc-800 focus:outline-none focus:border-zinc-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-zinc-600 mb-1">প্রাথমিক ব্যালেন্স</label>
+                <input
+                  type="number"
+                  step="any"
+                  placeholder="0.00"
+                  value={accountFormData.balance}
+                  onChange={(e) => setAccountFormData({ ...accountFormData, balance: e.target.value })}
+                  className="w-full bg-zinc-50 border border-zinc-200 rounded-xl p-2.5 text-xs font-bold text-zinc-800 focus:outline-none focus:border-zinc-900"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="isUSD"
+                  checked={accountFormData.isUSD}
+                  onChange={(e) => setAccountFormData({ ...accountFormData, isUSD: e.target.checked })}
+                  className="w-4 h-4 rounded text-zinc-900 focus:ring-0 cursor-pointer"
+                />
+                <label htmlFor="isUSD" className="text-xs font-bold text-zinc-700 cursor-pointer">
+                  এটি একটি USD ডলার অ্যাকাউন্ট
+                </label>
+              </div>
+
+              <div className="pt-3 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsAccountModalOpen(false)}
+                  className="px-4 py-2 border border-zinc-200 rounded-xl text-xs font-bold text-zinc-600 cursor-pointer"
+                >
+                  বাতিল
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-zinc-900 text-white rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  সংরক্ষণ করুন
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+};
+
   const menuItems = [
-    { id: 'dashboard', name: 'Dashboard', icon: <LayoutDashboard size={20} /> },
-    { id: 'master-table', name: 'Master Table', icon: <Table size={20} /> },
-    { id: 'products', name: 'Product', icon: <Package size={20} /> },
-    { id: 'categories', name: 'Categories', icon: <Ticket size={20} /> },
-    { id: 'orders', name: 'Order', icon: <ShoppingBag size={20} /> },
-    { id: 'customers', name: 'Customer', icon: <Users size={20} /> },
-    { id: 'banners', name: 'Banners', icon: <Settings size={20} /> },
+    { id: 'dashboard', name: 'Dashboard', icon: <LayoutDashboard size={19} /> },
+    { id: 'orders', name: 'Orders', icon: <ShoppingBag size={19} /> },
+    { id: 'products', name: 'Products', icon: <Package size={19} /> },
+    { id: 'categories', name: 'Categories', icon: <Layers size={19} /> },
+    { id: 'customers', name: 'Customers', icon: <Users size={19} /> },
+    { id: 'inventory', name: 'Inventory', icon: <Boxes size={19} /> },
+    { id: 'finance', name: 'Finance', icon: <DollarSign size={19} /> },
+    { id: 'supabase', name: 'Supabase Cloud', icon: <Database size={19} /> },
+    { id: 'banners', name: 'Banner & CMS', icon: <Settings size={19} /> },
+    { id: 'settings', name: 'Settings', icon: <SlidersHorizontal size={19} /> },
   ];
 
   return (
@@ -3363,79 +4827,97 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
       {/* Sidebar Toggle (Mobile) */}
       <button 
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className="lg:hidden fixed bottom-6 right-6 z-[60] bg-zinc-900 text-white p-4 rounded-full shadow-2xl"
+        className="lg:hidden fixed bottom-6 right-6 z-[60] bg-[#0e121e] text-white p-4 rounded-full shadow-2xl"
       >
         {isSidebarOpen ? <X size={24} /> : <LayoutDashboard size={24} />}
       </button>
 
+      {/* Mobile Backdrop Overlay */}
+      {isSidebarOpen && (
+        <div 
+          onClick={() => setIsSidebarOpen(false)} 
+          className="fixed inset-0 bg-black/60 z-40 lg:hidden backdrop-blur-xs transition-opacity"
+        />
+      )}
+
       {/* Sidebar */}
-      <motion.aside 
-        initial={false}
-        animate={{ 
-          width: isSidebarOpen ? (window.innerWidth < 1024 ? '100%' : 280) : 0, 
-          opacity: isSidebarOpen ? 1 : 0,
-          x: isSidebarOpen ? 0 : -280
-        }}
-        className="bg-white border-r border-zinc-200 overflow-hidden fixed h-full z-50 lg:z-40"
+      <aside 
+        className={`w-64 bg-[#0e121e] border-r border-zinc-800 fixed inset-y-0 left-0 z-50 text-white transition-transform duration-300 ease-in-out ${
+          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
       >
-        <div className="p-6 h-full flex flex-col">
-          <div className="flex justify-between items-center mb-10">
-            <Logo light={false} />
-            <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-2">
+        <div className="p-5 h-full flex flex-col">
+          <div className="flex justify-between items-center mb-8 px-2 pt-2">
+            <Logo light={true} />
+            <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-2 text-zinc-400 hover:text-white cursor-pointer">
               <X size={20} />
             </button>
           </div>
-          <nav className="space-y-1 flex-1 overflow-y-auto">
-            {menuItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setActiveTab(item.id);
-                  if (window.innerWidth < 1024) setIsSidebarOpen(false);
-                }}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-bold uppercase tracking-widest transition-colors rounded-lg ${
-                  activeTab === item.id 
-                    ? 'bg-zinc-900 text-white' 
-                    : 'text-zinc-500 hover:bg-zinc-100'
-                }`}
-              >
-                {item.icon}
-                <span>{item.name}</span>
-              </button>
-            ))}
+          <nav className="space-y-1.5 flex-1 overflow-y-auto pr-1">
+            {menuItems.map((item) => {
+              const isActive = activeTab === item.id || (item.id === 'inventory' && activeTab === 'master-table');
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    if (item.id === 'inventory') {
+                      setActiveTab('master-table');
+                    } else {
+                      setActiveTab(item.id);
+                    }
+                    if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-semibold transition-all rounded-xl cursor-pointer ${
+                    isActive 
+                      ? 'bg-[#7c5b2f] text-white shadow-md' 
+                      : 'text-zinc-300 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <span className={isActive ? 'text-white' : 'text-zinc-400'}>{item.icon}</span>
+                  <span className="tracking-tight">{item.name}</span>
+                </button>
+              );
+            })}
           </nav>
-          <div className="mt-10 pt-10 border-t border-zinc-100">
+          <div className="mt-6 pt-6 border-t border-zinc-800/80 px-1">
             <button 
               onClick={handleAdminLogout}
-              className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold uppercase tracking-widest text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-red-400 hover:bg-red-500/10 rounded-xl transition-colors cursor-pointer"
             >
-              <LogOut size={20} />
-              Logout
+              <LogOut size={18} />
+              <span>Logout</span>
             </button>
           </div>
         </div>
-      </motion.aside>
+      </aside>
 
       {/* Main Content */}
-      <main className={`flex-grow transition-all duration-300 ${isSidebarOpen ? 'lg:ml-[280px]' : 'ml-0'}`}>
-        <header className="bg-white border-b border-zinc-200 h-20 flex items-center justify-between px-8 sticky top-0 z-30">
-          <div className="flex items-center gap-4">
+      <main className={`flex-grow min-w-0 transition-all duration-300 ${isSidebarOpen ? 'lg:ml-64' : 'ml-0'}`}>
+        <header className="bg-white border-b border-zinc-200 h-16 sm:h-20 flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-30">
+          <div className="flex items-center gap-3 sm:gap-4">
             <button 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 text-zinc-500 hover:bg-zinc-100 rounded-lg transition-colors"
+              className="p-2 text-zinc-500 hover:bg-zinc-100 rounded-lg transition-colors cursor-pointer"
             >
-              <Menu size={24} />
+              <Menu size={22} />
             </button>
-            <h2 className="text-xl font-serif font-bold uppercase tracking-tight">
+            <h2 className="text-lg sm:text-xl font-serif font-bold uppercase tracking-tight truncate">
               {menuItems.find(i => i.id === activeTab)?.name}
             </h2>
           </div>
-          <button onClick={onBack} className="text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900">
-            Exit Admin
-          </button>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200/80 rounded-full text-emerald-800 text-[11px] font-bold tracking-tight">
+              <Database size={13} className="text-emerald-600" />
+              <span>Supabase Connected</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            </div>
+            <button onClick={onBack} className="text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-900 border border-zinc-200 px-3 py-1.5 rounded-lg transition-colors cursor-pointer">
+              Exit Admin
+            </button>
+          </div>
         </header>
 
-        <div className="p-8">
+        <div className="p-3.5 sm:p-5 lg:p-7 max-w-7xl mx-auto">
 
           {activeTab === 'dashboard' && (
             <div className="space-y-8">
@@ -3692,9 +5174,11 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
                       const pIdStr = product.id.toString();
                       const editData = masterStockEdits[pIdStr] || { stockMap: product.stockMap || {}, stockStatus: product.stockStatus || 'In Stock' };
                       
+                      const isShirtProd = (product.category || '').toLowerCase().includes('shirt');
+                      const fallbackSizes = isShirtProd ? ['M', 'L', 'XL', 'XXL'] : ['28', '30', '32', '34', '36', '38', '40'];
                       const pSizes = Array.isArray(product.sizes) && product.sizes.length > 0 
                         ? product.sizes.map(s => String(s).trim()).filter(Boolean) 
-                        : (typeof product.sizes === 'string' && product.sizes.trim().length > 0 ? product.sizes.split(',').map(s => s.trim()).filter(Boolean) : ['30', '32', '34', '36', '38']);
+                        : (typeof product.sizes === 'string' && product.sizes.trim().length > 0 ? product.sizes.split(',').map(s => s.trim()).filter(Boolean) : fallbackSizes);
                       
                       const pColors = Array.isArray(product.colors) && product.colors.length > 0 
                         ? product.colors.map(c => String(c).trim()).filter(Boolean) 
@@ -4146,24 +5630,7 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-serif font-bold">Product Catalog</h3>
                 <button 
-                  onClick={() => {
-                    setEditingProduct(null);
-                    setProductFormData({
-                      name: '',
-                      category: 'Formal Pant',
-                      price: 0,
-                      originalPrice: 0,
-                      image: '',
-                      fabric: 'Woven Cotton',
-                      fit: 'Slim Fit',
-                      description: '',
-                      sizes: '30, 32, 34, 36, 38',
-                      colors: 'Black, Navy, Grey',
-                      stock: 100,
-                      stockStatus: 'In Stock'
-                    });
-                    setShowProductForm(true);
-                  }}
+                  onClick={openAddProductModal}
                   className="btn-primary py-2 px-6 flex items-center gap-2 text-xs"
                 >
                   <Plus size={16} /> Add Product
@@ -4186,10 +5653,12 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
                         <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Category</label>
                         <select className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900 bg-transparent" value={productFormData.category} onChange={e => {
                           const newCat = e.target.value;
+                          const isShirt = newCat.toLowerCase().includes('shirt');
+                          const autoSizes = isShirt ? 'M, L, XL, XXL' : '28, 30, 32, 34, 36, 38, 40';
                           if (newCat === 'Cuban Shirt') {
-                            setProductFormData({...productFormData, category: newCat, sizes: 'M, L, XL, XXL', price: 599, originalPrice: 599});
+                            setProductFormData({...productFormData, category: newCat, sizes: autoSizes, price: 599, originalPrice: 599});
                           } else {
-                            setProductFormData({...productFormData, category: newCat});
+                            setProductFormData({...productFormData, category: newCat, sizes: autoSizes});
                           }
                         }}>
                           {categories.map(cat => (
@@ -4221,17 +5690,142 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
                         <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Colors (comma separated)</label>
                         <input className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900" value={productFormData.colors} onChange={e => setProductFormData({...productFormData, colors: e.target.value})} placeholder="Black, Navy, Grey" />
                       </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Product Image</label>
-                        <div className="flex gap-4 items-center">
-                          {productFormData.image && <img src={productFormData.image} alt="Preview" className="w-20 h-20 object-cover rounded border border-zinc-200" referrerPolicy="no-referrer" />}
-                          <div className="flex-grow">
-                            <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, 'product')} className="hidden" id="product-image-upload" />
-                            <label htmlFor="product-image-upload" className="inline-block px-6 py-2 border border-zinc-200 text-xs font-bold uppercase tracking-widest cursor-pointer hover:bg-zinc-50 transition-colors">
-                              {isUploading ? 'Uploading...' : 'Upload from Device'}
+                      <div className="md:col-span-2 bg-zinc-50 p-4 rounded-xl border border-zinc-200">
+                        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-3">
+                          <div>
+                            <label className="block text-xs font-bold uppercase tracking-widest text-zinc-900">
+                              Product Images (3-4 Images)
                             </label>
-                            <input className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900 text-sm mt-2" value={productFormData.image} onChange={e => setProductFormData({...productFormData, image: e.target.value})} placeholder="https://..." />
+                            <p className="text-[11px] text-zinc-500 mt-0.5">
+                              Upload 3-4 images from device or paste image URLs below. Click 'Set Main' to select primary cover image.
+                            </p>
                           </div>
+                          <div className="flex gap-2">
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              multiple 
+                              onChange={(e) => handleFileUpload(e, 'product')} 
+                              className="hidden" 
+                              id="product-image-upload" 
+                            />
+                            <label 
+                              htmlFor="product-image-upload" 
+                              className="inline-flex items-center gap-1.5 px-4 py-2 bg-zinc-900 text-white rounded-lg text-xs font-bold uppercase tracking-wider cursor-pointer hover:bg-zinc-800 transition-colors shadow-xs"
+                            >
+                              <Upload size={14} />
+                              {isUploading ? 'Uploading...' : 'Upload 3-4 Images'}
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Image Thumbnails Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-3">
+                          {(productFormData.images && productFormData.images.length > 0 
+                            ? productFormData.images 
+                            : (productFormData.image ? [productFormData.image] : [])
+                          ).map((imgUrl, idx) => {
+                            const isMain = productFormData.image === imgUrl || (!productFormData.image && idx === 0);
+                            return (
+                              <div key={idx} className="relative group rounded-lg overflow-hidden border border-zinc-200 bg-white aspect-square flex flex-col justify-between shadow-xs">
+                                <img src={imgUrl} alt={`Product ${idx + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                
+                                {isMain ? (
+                                  <span className="absolute top-1.5 left-1.5 bg-zinc-900/90 text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded shadow-xs">
+                                    Cover Main
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setProductFormData(prev => ({ ...prev, image: imgUrl }));
+                                    }}
+                                    className="absolute top-1.5 left-1.5 bg-white/90 text-zinc-900 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded shadow-xs hover:bg-zinc-900 hover:text-white transition-colors"
+                                  >
+                                    Set Main
+                                  </button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setProductFormData(prev => {
+                                      const currentImgs = prev.images && prev.images.length > 0 ? prev.images : (prev.image ? [prev.image] : []);
+                                      const newImgs = currentImgs.filter((_, i) => i !== idx);
+                                      const newMain = prev.image === imgUrl ? (newImgs[0] || '') : prev.image;
+                                      return {
+                                        ...prev,
+                                        images: newImgs,
+                                        image: newMain
+                                      };
+                                    });
+                                  }}
+                                  className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center opacity-90 hover:opacity-100 transition-opacity shadow-xs"
+                                  title="Remove image"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            );
+                          })}
+
+                          {(!productFormData.images || productFormData.images.length === 0) && !productFormData.image && (
+                            <div className="col-span-full border-2 border-dashed border-zinc-300 rounded-lg p-5 text-center text-zinc-400">
+                              <p className="text-xs font-semibold">No images added yet.</p>
+                              <p className="text-[11px] mt-1">Select 3-4 images from device or paste image URL below.</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Direct URL input for adding images */}
+                        <div className="mt-2 flex gap-2 items-center">
+                          <input 
+                            type="text" 
+                            placeholder="Paste image URL (https://...)" 
+                            id="new-image-url-input"
+                            className="flex-1 bg-white border border-zinc-200 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-zinc-900"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const input = e.currentTarget;
+                                const val = input.value.trim();
+                                if (val) {
+                                  setProductFormData(prev => {
+                                    const currentImages = prev.images && prev.images.length > 0 ? prev.images : (prev.image ? [prev.image] : []);
+                                    const updated = [...currentImages, val];
+                                    return {
+                                      ...prev,
+                                      images: updated,
+                                      image: prev.image || val
+                                    };
+                                  });
+                                  input.value = '';
+                                }
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const input = document.getElementById('new-image-url-input') as HTMLInputElement;
+                              if (input && input.value.trim()) {
+                                const val = input.value.trim();
+                                setProductFormData(prev => {
+                                  const currentImages = prev.images && prev.images.length > 0 ? prev.images : (prev.image ? [prev.image] : []);
+                                  const updated = [...currentImages, val];
+                                  return {
+                                    ...prev,
+                                    images: updated,
+                                    image: prev.image || val
+                                  };
+                                });
+                                input.value = '';
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-zinc-200 text-zinc-800 hover:bg-zinc-900 hover:text-white rounded-lg text-xs font-bold uppercase transition-colors"
+                          >
+                            Add URL
+                          </button>
                         </div>
                       </div>
                       <div className="md:col-span-2">
@@ -4247,8 +5841,27 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
                         <input className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900" value={productFormData.fit} onChange={e => setProductFormData({...productFormData, fit: e.target.value})} placeholder="Slim Fit" />
                       </div>
                       <div className="md:col-span-2">
-                        <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Sizes (comma separated)</label>
-                        <input className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900" value={productFormData.sizes} onChange={e => setProductFormData({...productFormData, sizes: e.target.value})} placeholder="30, 32, 34, 36, 38" />
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2">
+                          <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500">Sizes (comma separated)</label>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-zinc-400 font-medium">Quick Presets:</span>
+                            <button 
+                              type="button" 
+                              onClick={() => setProductFormData({ ...productFormData, sizes: '28, 30, 32, 34, 36, 38, 40' })}
+                              className="px-2 py-0.5 bg-zinc-100 hover:bg-zinc-900 hover:text-white rounded text-[10px] font-bold transition-colors cursor-pointer"
+                            >
+                              Pant (28-40)
+                            </button>
+                            <button 
+                              type="button" 
+                              onClick={() => setProductFormData({ ...productFormData, sizes: 'M, L, XL, XXL' })}
+                              className="px-2 py-0.5 bg-zinc-100 hover:bg-zinc-900 hover:text-white rounded text-[10px] font-bold transition-colors cursor-pointer"
+                            >
+                              Shirt (M-XXL)
+                            </button>
+                          </div>
+                        </div>
+                        <input className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900 text-sm font-medium" value={productFormData.sizes} onChange={e => setProductFormData({...productFormData, sizes: e.target.value})} placeholder="28, 30, 32, 34, 36, 38, 40 or M, L, XL, XXL" />
                       </div>
 
                       {/* Inventory Management Section */}
@@ -4277,9 +5890,11 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
                             const parsedFormColors = (typeof productFormData.colors === 'string' && productFormData.colors.trim().length > 0)
                               ? productFormData.colors.split(',').map(c => c.trim()).filter(Boolean)
                               : ['Standard'];
+                            const isShirtFormCat = (productFormData.category || '').toLowerCase().includes('shirt');
+                            const fallbackFormSizes = isShirtFormCat ? ['M', 'L', 'XL', 'XXL'] : ['28', '30', '32', '34', '36', '38', '40'];
                             const parsedFormSizes = (typeof productFormData.sizes === 'string' && productFormData.sizes.trim().length > 0)
                               ? productFormData.sizes.split(',').map(s => s.trim()).filter(Boolean)
-                              : ['30', '32', '34', '36', '38'];
+                              : fallbackFormSizes;
 
                             return parsedFormColors.map(color => (
                               <div key={color} className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-sm">
@@ -4334,10 +5949,11 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
                                               type="button"
                                               onClick={() => {
                                                 const newVal = Math.max(0, qty - 1);
+                                                const currentMap = productFormData.stockMap || {};
                                                 const updated = {
-                                                  ...productFormData.stockMap,
+                                                  ...currentMap,
                                                   [color]: {
-                                                    ...(productFormData.stockMap[color] || {}),
+                                                    ...(currentMap[color] || {}),
                                                     [size]: newVal
                                                   }
                                                 };
@@ -4364,10 +5980,11 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
                                               value={qty}
                                               onChange={(e) => {
                                                 const val = Math.max(0, parseInt(e.target.value) || 0);
+                                                const currentMap = productFormData.stockMap || {};
                                                 const updated = {
-                                                  ...productFormData.stockMap,
+                                                  ...currentMap,
                                                   [color]: {
-                                                    ...(productFormData.stockMap[color] || {}),
+                                                    ...(currentMap[color] || {}),
                                                     [size]: val
                                                   }
                                                 };
@@ -4387,10 +6004,11 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
                                               type="button"
                                               onClick={() => {
                                                 const newVal = qty + 1;
+                                                const currentMap = productFormData.stockMap || {};
                                                 const updated = {
-                                                  ...productFormData.stockMap,
+                                                  ...currentMap,
                                                   [color]: {
-                                                    ...(productFormData.stockMap[color] || {}),
+                                                    ...(currentMap[color] || {}),
                                                     [size]: newVal
                                                   }
                                                 };
@@ -4675,6 +6293,112 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
               </div>
             </div>
           )}
+
+          {/* Finance Tab */}
+          {activeTab === 'finance' && (
+            <FinanceManager showToast={showToast} />
+          )}
+
+          {/* Supabase Cloud Tab */}
+          {activeTab === 'supabase' && (
+            <div className="space-y-6">
+              <div className="bg-white p-6 sm:p-8 rounded-2xl border border-zinc-200/80 shadow-xs">
+                <div className="flex items-center justify-between mb-6 pb-6 border-b border-zinc-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md">
+                      <Database size={24} />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-serif font-bold text-zinc-900">Supabase Cloud Integration</h3>
+                      <p className="text-xs text-zinc-500 mt-0.5">Live PostgreSQL Cloud Database status & synchronization engine</p>
+                    </div>
+                  </div>
+                  <span className="px-3.5 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs font-bold flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>CONNECTED & ACTIVE</span>
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200/80">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Project Endpoint URL</p>
+                    <p className="text-sm font-mono font-bold text-zinc-900 mt-1 break-all">
+                      https://afwislqtlcfglimaacxk.supabase.co
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200/80">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Anon Public Key</p>
+                    <p className="text-sm font-mono font-bold text-zinc-900 mt-1 truncate">
+                      sb_publishable_6hhesP3nklqpR3SovQhUpQ_l47YNy6M
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-4">
+                  <button 
+                    onClick={async () => {
+                      showToast('Syncing all products to Supabase...', 'info');
+                      await syncProductsToSupabase(products);
+                      showToast('Products successfully synced to Supabase!', 'success');
+                    }}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors shadow-xs flex items-center gap-2 cursor-pointer"
+                  >
+                    <Database size={16} />
+                    <span>Sync Products to Supabase</span>
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      const isOk = await testSupabaseConnection();
+                      if (isOk) {
+                        showToast('Supabase Connection Test Succeeded!', 'success');
+                      } else {
+                        showToast('Supabase Connection Test Failed.', 'error');
+                      }
+                    }}
+                    className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors shadow-xs cursor-pointer"
+                  >
+                    Test Connection
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Settings Tab */}
+          {activeTab === 'settings' && (
+            <div className="space-y-6 max-w-2xl">
+              <div className="bg-white p-6 sm:p-8 rounded-2xl border border-zinc-200/80 shadow-xs">
+                <div className="flex items-center gap-3 mb-6 pb-6 border-b border-zinc-100">
+                  <div className="w-10 h-10 rounded-xl bg-zinc-900 text-white flex items-center justify-center">
+                    <SlidersHorizontal size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-serif font-bold text-zinc-900">Store Settings</h3>
+                    <p className="text-xs text-zinc-500 mt-0.5">General website contact & store location parameters</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4 text-xs sm:text-sm">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1">Store Name</label>
+                    <input type="text" readOnly value="ELEGAN BD" className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl font-bold" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1">Store Address</label>
+                    <input type="text" readOnly value="Ma Villa, House #11, Road #3, Block F, Section #1, Mirpur, Dhaka-1216" className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl font-medium" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1">Support Phone Number</label>
+                    <input type="text" readOnly value="+8801327772213" className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl font-bold font-mono" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1">Support Email</label>
+                    <input type="text" readOnly value="eleganbdltd@gmail.com" className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl font-bold font-mono" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         
         {/* Confirmation Dialog Modal */}
@@ -4707,88 +6431,159 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
 
 const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
   return (
-    <footer className="bg-zinc-900 text-white pt-16 md:pt-24 pb-10">
+    <footer className="bg-[#0b0f19] text-white pt-12 pb-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
-          <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
-            <Logo className="mb-6" />
-            <p className="text-zinc-400 text-sm leading-relaxed mb-8 max-w-xs">
-              Premium formal wear for the modern gentleman. Crafted with precision, designed for elegance.
-            </p>
-            <div className="flex gap-4">
-              <a href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          
+          {/* Card 1: ELEGAN BD */}
+          <div className="bg-[#121722] border border-zinc-800/80 rounded-2xl p-6 sm:p-7 flex flex-col justify-between">
+            <div>
+              <h3 className="text-base font-bold text-white uppercase tracking-wider mb-4">
+                ELEGAN BD
+              </h3>
+              <p className="text-zinc-400 text-xs sm:text-sm leading-relaxed mb-6">
+                Premium formal wear for the modern gentleman. Crafted with precision, designed for elegance.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <a href="#" className="w-10 h-10 rounded-full bg-zinc-800/80 hover:bg-zinc-700/80 text-zinc-300 flex items-center justify-center transition-colors">
                 <Facebook size={18} />
               </a>
-              <a href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
+              <a href="#" className="w-10 h-10 rounded-full bg-zinc-800/80 hover:bg-zinc-700/80 text-zinc-300 flex items-center justify-center transition-colors">
                 <Instagram size={18} />
               </a>
-              <a href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
+              <a href="tel:+8801327772213" className="w-10 h-10 rounded-full bg-zinc-800/80 hover:bg-zinc-700/80 text-zinc-300 flex items-center justify-center transition-colors">
                 <Phone size={18} />
               </a>
             </div>
           </div>
-          
-          <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
-            <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] mb-8 text-white/50">Quick Links</h4>
-            <ul className="space-y-4 text-sm text-zinc-400">
-              <li><button onClick={() => onNavigate('shop')} className="hover:text-white transition-colors">Shop All</button></li>
-              <li><button onClick={() => onNavigate('shop')} className="hover:text-white transition-colors">New Arrivals</button></li>
-              <li><button onClick={() => onNavigate('returns-policy')} className="hover:text-white transition-colors">Returns & Exchange</button></li>
-            </ul>
+
+          {/* Card 2: QUICK LINKS */}
+          <div className="bg-[#121722] border border-zinc-800/80 rounded-2xl p-6 sm:p-7 flex flex-col justify-between">
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-widest text-white mb-5">
+                QUICK LINKS
+              </h3>
+              <ul className="space-y-3.5 text-xs sm:text-sm text-zinc-400 font-medium">
+                <li>
+                  <button onClick={() => onNavigate('shop')} className="hover:text-white transition-colors">
+                    Shop All
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => onNavigate('shop')} className="hover:text-white transition-colors">
+                    New Arrivals
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => onNavigate('returns-policy')} className="hover:text-white transition-colors">
+                    Returns & Exchange
+                  </button>
+                </li>
+                <li className="pt-2">
+                  <button 
+                    onClick={() => onNavigate('admin')} 
+                    className="flex items-center gap-2 text-amber-400 hover:text-amber-300 font-bold text-xs uppercase tracking-wider transition-colors"
+                  >
+                    <span>🔒</span>
+                    <span>Admin Portal</span>
+                  </button>
+                </li>
+              </ul>
+            </div>
           </div>
 
-          <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
-            <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] mb-8 text-white/50">Customer Care</h4>
-            <ul className="space-y-4 text-sm text-zinc-400">
-              <li><button onClick={() => onNavigate('track-order')} className="hover:text-white transition-colors font-bold text-white">Track Your Order</button></li>
-              <li><button onClick={() => onNavigate('about')} className="hover:text-white transition-colors">About Elegan BD</button></li>
-              <li><button onClick={() => onNavigate('contact')} className="hover:text-white transition-colors">Contact Us</button></li>
-              <li><button onClick={() => onNavigate('privacy-policy')} className="hover:text-white transition-colors">Privacy Policy</button></li>
-              <li><button onClick={() => onNavigate('terms-conditions')} className="hover:text-white transition-colors">Terms & Conditions</button></li>
-            </ul>
+          {/* Card 3: CUSTOMER CARE */}
+          <div className="bg-[#121722] border border-zinc-800/80 rounded-2xl p-6 sm:p-7 flex flex-col justify-between">
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-widest text-white mb-5">
+                CUSTOMER CARE
+              </h3>
+              <ul className="space-y-3.5 text-xs sm:text-sm text-zinc-400 font-medium">
+                <li>
+                  <button onClick={() => onNavigate('track-order')} className="text-white font-bold hover:underline transition-all">
+                    Track Your Order
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => onNavigate('about')} className="hover:text-white transition-colors">
+                    About Elegan BD
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => onNavigate('contact')} className="hover:text-white transition-colors">
+                    Contact Us
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => onNavigate('privacy-policy')} className="hover:text-white transition-colors">
+                    Privacy Policy
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => onNavigate('terms-conditions')} className="hover:text-white transition-colors">
+                    Terms & Conditions
+                  </button>
+                </li>
+              </ul>
+            </div>
           </div>
 
-          <div className="flex flex-col items-center sm:items-start text-center sm:text-left">
-            <h4 className="text-[10px] font-bold uppercase tracking-[0.3em] mb-8 text-white/50">Contact Info</h4>
-            <div className="space-y-6">
-              <div className="flex items-center gap-4 group cursor-pointer">
-                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-colors">
-                  <Mail size={16} className="text-zinc-400" />
+          {/* Card 4: CONTACT INFO */}
+          <div className="bg-[#121722] border border-zinc-800/80 rounded-2xl p-6 sm:p-7 flex flex-col justify-between space-y-5">
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-widest text-white mb-5">
+                CONTACT INFO
+              </h3>
+              
+              <div className="space-y-4 text-xs sm:text-sm">
+                {/* Address */}
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-zinc-800/80 flex items-center justify-center shrink-0 mt-0.5 text-zinc-300">
+                    <MapPin size={15} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">ADDRESS</p>
+                    <p className="text-zinc-200 text-xs font-medium leading-relaxed mt-0.5">
+                      Ma Villa, House #11, Road #3, Block F, Section #1, Mirpur, Dhaka-1216
+                    </p>
+                  </div>
                 </div>
-                <div className="text-left">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Email Us</p>
-                  <p className="text-sm text-zinc-300">eleganbdltd@gmail.com</p>
+
+                {/* Email */}
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-zinc-800/80 flex items-center justify-center shrink-0 text-zinc-300">
+                    <Mail size={15} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">EMAIL US</p>
+                    <a href="mailto:eleganbdltd@gmail.com" className="text-zinc-200 text-xs font-medium hover:text-white transition-colors">
+                      eleganbdltd@gmail.com
+                    </a>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-4 group cursor-pointer">
-                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-colors">
-                  <Phone size={16} className="text-zinc-400" />
-                </div>
-                <div className="text-left">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Call Us</p>
-                  <p className="text-sm text-zinc-300">+8801631496122</p>
-                  <p className="text-sm text-zinc-300">+8801623-766036</p>
+
+                {/* Phone */}
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-zinc-800/80 flex items-center justify-center shrink-0 text-zinc-300">
+                    <Phone size={15} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">CALL US</p>
+                    <a href="tel:+8801327772213" className="text-zinc-200 text-xs font-bold font-mono hover:text-white transition-colors">
+                      +8801327772213
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
+
         </div>
-        
-        <div className="border-t border-zinc-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="text-center md:text-left">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-              2026 ELEGAN BD. All Rights Reserved.
-            </p>
-            <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-zinc-600 mt-1">
-              Developed by Sabbir Rahman
-            </p>
-          </div>
-          <button 
-            onClick={() => onNavigate('admin')} 
-            className="text-[10px] font-bold uppercase tracking-widest text-zinc-700 hover:text-zinc-400 transition-colors"
-          >
-            Admin
-          </button>
+
+        {/* Copyright */}
+        <div className="mt-8 pt-6 border-t border-zinc-800/80 text-center text-xs text-zinc-500 font-medium">
+          © {new Date().getFullYear()} ELEGAN BD. All rights reserved.
         </div>
       </div>
     </footer>
@@ -4798,7 +6593,7 @@ const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
 // --- Main App ---
 
 export default function App() {
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(false);
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -4897,7 +6692,7 @@ export default function App() {
       fabric: "Premium Tropical",
       fit: "Slim Fit",
       description: "Our signature formal pant designed for maximum comfort and style.",
-      sizes: ["28", "30", "32", "34", "36"],
+      sizes: ["28", "30", "32", "34", "36", "38", "40"],
       colors: ["Navy", "Black", "Grey"],
       stock: 45
     },
@@ -4945,7 +6740,7 @@ export default function App() {
       fabric: "Premium Tropical",
       fit: "Slim Fit",
       description: "Versatile charcoal grey pant for daily office wear.",
-      sizes: ["28", "30", "32", "34", "36"],
+      sizes: ["28", "30", "32", "34", "36", "38", "40"],
       colors: ["Grey", "Charcoal"],
       stock: 50
     },
@@ -5399,8 +7194,6 @@ export default function App() {
               onToggleWishlist={handleToggleWishlist}
             />
 
-            <AutoScrollCarousel products={interleavedProducts} onSelect={handleProductSelect} user={user} onToggleWishlist={handleToggleWishlist} />
-
             {/* Top Rated Products Section */}
             <section className="py-16 md:py-32 bg-white">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -5583,6 +7376,8 @@ export default function App() {
             onBack={() => setCurrentPage('shop')} 
             onComplete={handleCheckoutComplete}
             showToast={showToast}
+            onUpdateQty={updateCartQty}
+            onRemoveItem={removeFromCart}
           />
         )}
 
