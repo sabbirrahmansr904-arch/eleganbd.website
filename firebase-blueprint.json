@@ -1,0 +1,143 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "A product in the store",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "price": { "type": "number" },
+        "original_price": { "type": "number" },
+        "image": { "type": "string" },
+        "images": { "type": "string" },
+        "fabric": { "type": "string" },
+        "fit": { "type": "string" },
+        "description": { "type": "string" },
+        "sizes": { "type": "string" },
+        "rating": { "type": "number" },
+        "reviews": { "type": "number" },
+        "category": { "type": "string" }
+      },
+      "required": ["name", "price", "image", "category"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A customer order",
+      "type": "object",
+      "properties": {
+        "customer_name": { "type": "string" },
+        "customer_phone": { "type": "string" },
+        "customer_address": { "type": "string" },
+        "total": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "processing", "shipped", "delivered", "cancelled"] },
+        "created_at": { "type": "string" },
+        "items": { "type": "string" }
+      },
+      "required": ["customer_name", "customer_phone", "customer_address", "total", "status", "created_at", "items"]
+    },
+    "Banner": {
+      "title": "Banner",
+      "description": "A promotional banner",
+      "type": "object",
+      "properties": {
+        "image": { "type": "string" },
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "button_text": { "type": "string" },
+        "link": { "type": "string" }
+      },
+      "required": ["image", "title", "link"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "A registered customer",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "total_orders": { "type": "number" },
+        "total_spent": { "type": "number" },
+        "last_order": { "type": "string" }
+      },
+      "required": ["name", "phone"]
+    },
+    "Coupon": {
+      "title": "Coupon",
+      "description": "A discount coupon",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "discount_percentage": { "type": "number" },
+        "is_active": { "type": "number" }
+      },
+      "required": ["code", "discount_percentage", "is_active"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "A product review",
+      "type": "object",
+      "properties": {
+        "product_id": { "type": "string" },
+        "user_name": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["product_id", "user_name", "rating", "comment", "date"]
+    },
+    "Setting": {
+      "title": "Setting",
+      "description": "A global setting",
+      "type": "object",
+      "properties": {
+        "value": { "type": "string" }
+      },
+      "required": ["value"]
+    },
+    "User": {
+      "title": "User",
+      "description": "A user profile",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "customer"] }
+      },
+      "required": ["email", "role"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Store products"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer orders"
+    },
+    "/banners/{bannerId}": {
+      "schema": "Banner",
+      "description": "Promotional banners"
+    },
+    "/customers/{customerId}": {
+      "schema": "Customer",
+      "description": "Customer profiles"
+    },
+    "/coupons/{couponId}": {
+      "schema": "Coupon",
+      "description": "Discount coupons"
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Product reviews"
+    },
+    "/settings/{settingId}": {
+      "schema": "Setting",
+      "description": "Global settings"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and roles"
+    }
+  }
+}
