@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShoppingBag, 
@@ -1211,6 +1211,83 @@ const BannerCarousel = ({ banners }: { banners: Banner[] }) => {
   );
 };
 
+const MiddleBanner = ({ banner, onNavigate }: { banner?: Banner, onNavigate: (page: string) => void }) => {
+  const currentBanner: Banner = banner || {
+    id: 'default_middle_banner',
+    image: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=1920&h=700',
+    mobile_image: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=800&h=900',
+    title: 'CRAFTED FOR DISTINCTION',
+    subtitle: 'Discover our signature tailored formal wear designed for modern elegance.',
+    buttonText: 'SHOP NOW',
+    link: 'shop'
+  };
+
+  const imageSrc = currentBanner.image || currentBanner.mobile_image || 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=1920&h=700';
+
+  return (
+    <section 
+      className="relative w-full overflow-hidden bg-zinc-900 group cursor-pointer"
+      onClick={() => onNavigate(currentBanner.link || 'shop')}
+    >
+      <picture className="w-full block">
+        {currentBanner.mobile_image && (
+          <source
+            media="(max-width: 767px)"
+            srcSet={currentBanner.mobile_image}
+          />
+        )}
+        <img
+          src={imageSrc}
+          alt={currentBanner.title || 'Special Collection Banner'}
+          className="w-full aspect-[800/900] md:aspect-[1920/700] object-cover block transition-transform duration-700 group-hover:scale-105"
+          referrerPolicy="no-referrer"
+        />
+      </picture>
+      
+      {/* Banner Text Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-black/10 z-10 flex flex-col items-center justify-end md:justify-center text-center p-6 md:p-12">
+        {currentBanner.title && (
+          <motion.h3 
+            initial={{ y: 20, opacity: 0 }}
+            whileInView={{ y: 0, opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="text-white text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-serif font-bold mb-2 sm:mb-3 tracking-tight drop-shadow-md"
+          >
+            {currentBanner.title}
+          </motion.h3>
+        )}
+        {currentBanner.subtitle && (
+          <motion.p 
+            initial={{ y: 20, opacity: 0 }}
+            whileInView={{ y: 0, opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="text-white/90 text-xs sm:text-base md:text-xl max-w-2xl font-light mb-4 sm:mb-6 drop-shadow-sm"
+          >
+            {currentBanner.subtitle}
+          </motion.p>
+        )}
+        {currentBanner.buttonText && (
+          <motion.button
+            initial={{ scale: 0.9, opacity: 0 }}
+            whileInView={{ scale: 1, opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.4, delay: 0.2 }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onNavigate(currentBanner.link || 'shop');
+            }}
+            className="px-6 sm:px-8 py-2.5 sm:py-3.5 rounded-full bg-[#cfa83b] hover:bg-white text-[#111827] font-bold text-xs uppercase tracking-widest transition-all duration-300 shadow-xl cursor-pointer transform hover:-translate-y-0.5"
+          >
+            {currentBanner.buttonText}
+          </motion.button>
+        )}
+      </div>
+    </section>
+  );
+};
+
 const TrustFeatureBadges = () => {
   const items = [
     {
@@ -1236,8 +1313,8 @@ const TrustFeatureBadges = () => {
   ];
 
   return (
-    <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-5 mb-8 relative z-20">
-      <div className="bg-white rounded-2xl sm:rounded-3xl border border-zinc-200/90 shadow-sm p-5 sm:p-6 md:p-8">
+    <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-5 sm:-mt-8 md:-mt-10 mb-8 sm:mb-12 relative z-20">
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-zinc-200/90 shadow-md p-5 sm:p-6 md:p-8">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6 lg:gap-8 items-center">
           {items.map((item, idx) => (
             <div key={idx} className="flex items-center gap-3.5 sm:gap-4">
@@ -1355,18 +1432,73 @@ const ProductCard = ({ product, onSelect, showColorsOnRight, isWishlisted, onTog
   );
 };
 
-const FeaturedCollection = ({ products, onSelect, user, onToggleWishlist }: { 
+const FeaturedCollection = ({ 
+  title = "EXPLORE OUR PANT COLLECTION",
+  products, 
+  onSelect, 
+  user, 
+  onToggleWishlist, 
+  categories: propCategories,
+  filterType = 'pant'
+}: { 
+  title?: string,
   products: Product[], 
   onSelect: (p: Product) => void, 
   user?: User | null, 
-  onToggleWishlist?: (e: React.MouseEvent, p: Product) => void 
+  onToggleWishlist?: (e: React.MouseEvent, p: Product) => void,
+  categories?: string[],
+  filterType?: 'all' | 'pant' | 'shirt'
 }) => {
   const [activeTab, setActiveTab] = useState('All');
   const [sortBy, setSortBy] = useState('default');
   
-  const categories = ['All', 'Formal Pant', 'Formal Shirt', 'Blazer'];
+  const isPant = (p: Product) => {
+    const cat = (p.category || '').toLowerCase();
+    const name = (p.name || '').toLowerCase();
+    return cat.includes('pant') || cat.includes('trouser') || name.includes('pant') || name.includes('trouser');
+  };
 
-  const filteredProducts = products.filter(p => {
+  const isShirt = (p: Product) => {
+    const cat = (p.category || '').toLowerCase();
+    const name = (p.name || '').toLowerCase();
+    return cat.includes('shirt') || cat.includes('polo') || name.includes('shirt') || name.includes('polo');
+  };
+
+  const baseProducts = useMemo(() => {
+    if (filterType === 'pant') {
+      const pants = products.filter(isPant);
+      return pants.length > 0 ? pants : products;
+    }
+    if (filterType === 'shirt') {
+      const shirts = products.filter(isShirt);
+      return shirts.length > 0 ? shirts : products;
+    }
+    return products;
+  }, [products, filterType]);
+
+  const categories = useMemo(() => {
+    if (filterType === 'pant') {
+      const fromProps = (propCategories || []).filter(c => c.toLowerCase().includes('pant') || c.toLowerCase().includes('trouser'));
+      const fromProducts = Array.from(new Set(baseProducts.map(p => p.category).filter(Boolean)));
+      const combined = Array.from(new Set([...fromProducts, ...fromProps]));
+      return ['All', ...(combined.length > 0 ? combined : ['Formal Pant'])];
+    }
+    if (filterType === 'shirt') {
+      const fromProps = (propCategories || []).filter(c => c.toLowerCase().includes('shirt') || c.toLowerCase().includes('polo'));
+      const fromProducts = Array.from(new Set(baseProducts.map(p => p.category).filter(Boolean)));
+      const combined = Array.from(new Set([...fromProducts, ...fromProps]));
+      return ['All', ...(combined.length > 0 ? combined : ['Formal Shirt', 'Cuban Shirt'])];
+    }
+    return ['All', ...(propCategories && propCategories.length > 0 ? propCategories : ['Formal Pant', 'Formal Shirt', 'Blazer'])];
+  }, [baseProducts, filterType, propCategories]);
+
+  useEffect(() => {
+    if (activeTab !== 'All' && !categories.includes(activeTab)) {
+      setActiveTab('All');
+    }
+  }, [categories, activeTab]);
+
+  const filteredProducts = baseProducts.filter(p => {
     if (activeTab === 'All') return true;
     return p.category === activeTab;
   }).sort((a, b) => {
@@ -1376,40 +1508,42 @@ const FeaturedCollection = ({ products, onSelect, user, onToggleWishlist }: {
   });
 
   return (
-    <section className="py-16 md:py-24 bg-[#fafafa]">
+    <section className="pt-4 sm:pt-8 pb-8 sm:pb-12 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-10">
-          <h2 className="text-3xl md:text-5xl font-serif font-bold text-[#111827] mb-4 tracking-tight uppercase">EXPLORE OUR COLLECTION</h2>
-          <div className="h-[2px] w-32 bg-[#cca94b] mx-auto mb-10"></div>
+        <div className="text-center mb-10 sm:mb-12">
+          <h2 className="text-3xl md:text-5xl font-serif font-bold text-[#111827] mb-3 sm:mb-4 tracking-tight uppercase">
+            {title}
+          </h2>
+          <div className="h-[2px] w-28 sm:w-32 bg-[#cca94b] mx-auto mb-8 sm:mb-10"></div>
           
-          <div className="flex flex-wrap justify-center gap-3 mb-6">
+          <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 mb-8 sm:mb-10">
             {categories.map(category => (
               <button
                 key={category}
                 onClick={() => setActiveTab(category)}
-                className={`px-8 py-3 rounded-[30px] font-medium text-sm transition-all duration-300 border ${
+                className={`whitespace-nowrap px-5 sm:px-7 py-2 sm:py-2.5 rounded-[30px] font-medium text-xs sm:text-sm transition-all duration-300 border ${
                   activeTab === category 
-                    ? 'bg-[#cfa83b] text-[#111827] border-[#cfa83b] shadow-md transform -translate-y-0.5' 
+                    ? 'bg-[#cfa83b] text-[#111827] border-[#cfa83b] shadow-sm transform -translate-y-0.5' 
                     : 'bg-white text-zinc-600 border-zinc-200 hover:border-[#cfa83b] hover:text-[#111827]'
                 }`}
               >
                 {category}
               </button>
             ))}
-          </div>
 
-          <div className="flex justify-center mb-10 relative">
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="appearance-none bg-white border border-zinc-200 text-zinc-600 text-sm rounded-[30px] px-6 py-2.5 pr-10 outline-none focus:border-[#cfa83b] hover:border-[#cfa83b] transition-colors cursor-pointer"
-            >
-              <option value="default">Sort By</option>
-              <option value="price-asc">Price: Low to High</option>
-              <option value="price-desc">Price: High to Low</option>
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 justify-center w-32">
-              <svg className="w-4 h-4 text-zinc-400 -mr-20" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+            <div className="relative inline-flex items-center">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="appearance-none bg-white border border-zinc-200 text-zinc-600 text-xs sm:text-sm font-medium rounded-[30px] px-4 sm:px-5 py-2 sm:py-2.5 pr-8 sm:pr-9 outline-none focus:border-[#cfa83b] hover:border-[#cfa83b] transition-colors cursor-pointer shadow-xs whitespace-nowrap"
+              >
+                <option value="default">Sort By</option>
+                <option value="price-asc">Price: Low to High</option>
+                <option value="price-desc">Price: High to Low</option>
+              </select>
+              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400">
+                <ChevronDown size={14} />
+              </div>
             </div>
           </div>
         </div>
@@ -2694,14 +2828,35 @@ const CheckoutPage = ({
   );
 };
 
-const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshPromoImage, onRefreshHeroVideo, onRefreshHeroImage, showToast }: { onBack: () => void, onRefreshProducts: () => void, onRefreshBanners: () => void, onRefreshPromoImage: () => void, onRefreshHeroVideo: () => void, onRefreshHeroImage: () => void, showToast: (msg: string, type?: 'success' | 'error' | 'info') => void }) => {
+const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshPromoImage, onRefreshHeroVideo, onRefreshHeroImage, onRefreshCategories, onRefreshMiddleBanner, showToast }: { onBack: () => void, onRefreshProducts: () => void, onRefreshBanners: () => void, onRefreshPromoImage: () => void, onRefreshHeroVideo: () => void, onRefreshHeroImage: () => void, onRefreshCategories?: () => void, onRefreshMiddleBanner?: () => void, showToast: (msg: string, type?: 'success' | 'error' | 'info') => void }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [customers, setCustomers] = useState<User[]>([]);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [topRatedOfferImage, setTopRatedOfferImage] = useState('');
-  const [categories, setCategories] = useState<string[]>(['Formal Pant', 'Formal Shirt', 'Blazer', 'Office Wear', 'Premium Collection', 'Best Seller', 'Cuban Shirt']);
+  const defaultMiddleBanner: Banner = {
+    id: 'default_middle_banner',
+    image: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=1920&h=700',
+    mobile_image: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=800&h=900',
+    title: 'CRAFTED FOR DISTINCTION',
+    subtitle: 'Discover our signature tailored formal wear designed for modern elegance.',
+    buttonText: 'SHOP NOW',
+    link: 'shop'
+  };
+  const [middleBanner, setMiddleBanner] = useState<Banner>(defaultMiddleBanner);
+  const [middleBannerFormData, setMiddleBannerFormData] = useState<Banner>(defaultMiddleBanner);
+  const [showMiddleBannerModal, setShowMiddleBannerModal] = useState(false);
+  const [categories, setCategories] = useState<string[]>(() => {
+    const saved = localStorage.getItem('elegan_product_categories');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return ['Formal Pant', 'Formal Shirt', 'Blazer', 'Office Wear', 'Premium Collection', 'Best Seller', 'Cuban Shirt'];
+  });
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
@@ -2759,7 +2914,89 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
       }
     };
     fetchHeroImage();
+
+    const fetchMiddleBanner = async () => {
+      try {
+        const docSnap = await getDoc(doc(db, 'settings', 'middle_banner'));
+        if (docSnap.exists() && docSnap.data().image) {
+          const data = { id: 'middle_banner', ...docSnap.data() } as Banner;
+          setMiddleBanner(data);
+          setMiddleBannerFormData(data);
+        }
+      } catch (err) {
+        console.warn('Middle banner fetch notice in admin:', err);
+      }
+    };
+    fetchMiddleBanner();
   }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const docSnap = await getDoc(doc(db, 'settings', 'product_categories'));
+      if (docSnap.exists() && docSnap.data().value) {
+        const parsed = JSON.parse(docSnap.data().value);
+        if (Array.isArray(parsed)) {
+          setCategories(parsed);
+          localStorage.setItem('elegan_product_categories', JSON.stringify(parsed));
+          return parsed;
+        }
+      } else {
+        const saved = localStorage.getItem('elegan_product_categories');
+        let initialList = ['Formal Pant', 'Formal Shirt', 'Blazer', 'Office Wear', 'Premium Collection', 'Best Seller', 'Cuban Shirt'];
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) initialList = parsed;
+          } catch (e) {}
+        }
+        setCategories(initialList);
+        localStorage.setItem('elegan_product_categories', JSON.stringify(initialList));
+        await setDoc(doc(db, 'settings', 'product_categories'), { value: JSON.stringify(initialList) });
+        return initialList;
+      }
+    } catch (err) {
+      console.warn('Notice loading categories in admin:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const handleAddCategory = async (catName: string) => {
+    const trimmed = catName.trim();
+    if (!trimmed) {
+      showToast('অনুগ্রহ করে ক্যাটাগরির নাম লিখুন', 'error');
+      return;
+    }
+    if (categories.includes(trimmed)) {
+      showToast('এই ক্যাটাগরিটি ইতিমধ্যে তালিকাভুক্ত আছে', 'info');
+      return;
+    }
+    const updated = [...categories, trimmed];
+    setCategories(updated);
+    localStorage.setItem('elegan_product_categories', JSON.stringify(updated));
+    showToast(`ক্যাটাগরি "${trimmed}" যুক্ত করা হয়েছে`, 'success');
+    try {
+      await setDoc(doc(db, 'settings', 'product_categories'), { value: JSON.stringify(updated) });
+    } catch (err) {
+      console.warn('Firestore categories save notice:', err);
+    }
+    if (onRefreshCategories) onRefreshCategories();
+  };
+
+  const handleDeleteCategory = async (catToDelete: string) => {
+    const updated = categories.filter(c => c !== catToDelete);
+    setCategories(updated);
+    localStorage.setItem('elegan_product_categories', JSON.stringify(updated));
+    showToast(`ক্যাটাগরি "${catToDelete}" মুছে ফেলা হয়েছে`, 'info');
+    try {
+      await setDoc(doc(db, 'settings', 'product_categories'), { value: JSON.stringify(updated) });
+    } catch (err) {
+      console.warn('Firestore categories delete notice:', err);
+    }
+    if (onRefreshCategories) onRefreshCategories();
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -2888,6 +3125,10 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
           if (docSnap.exists()) {
             setTopRatedOfferImage(docSnap.data().value);
           }
+          setLoading(false);
+        });
+      } else if (activeTab === 'categories') {
+        fetchCategories().then(() => {
           setLoading(false);
         });
       }
@@ -3387,7 +3628,7 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
     setShowProductForm(true);
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'product' | 'banner' | 'banner_mobile' | 'top_rated_offer' | 'hero_image' = 'product') => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'product' | 'banner' | 'banner_mobile' | 'top_rated_offer' | 'hero_image' | 'middle_banner' | 'middle_banner_mobile' = 'product') => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
@@ -3464,6 +3705,10 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
           setHeroImage(url);
           await setDoc(doc(db, 'settings', 'hero_image'), { value: url });
           onRefreshHeroImage();
+        } else if (type === 'middle_banner') {
+          setMiddleBannerFormData(prev => ({ ...prev, image: url }));
+        } else if (type === 'middle_banner_mobile') {
+          setMiddleBannerFormData(prev => ({ ...prev, mobile_image: url }));
         }
       }
     } catch (err) {
@@ -3471,6 +3716,27 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
       showToast('Image upload failed. Please try again.', 'error');
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleSaveMiddleBanner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await setDoc(doc(db, 'settings', 'middle_banner'), {
+        image: middleBannerFormData.image || defaultMiddleBanner.image,
+        mobile_image: middleBannerFormData.mobile_image || middleBannerFormData.image || defaultMiddleBanner.mobile_image,
+        title: middleBannerFormData.title || '',
+        subtitle: middleBannerFormData.subtitle || '',
+        buttonText: middleBannerFormData.buttonText || 'SHOP NOW',
+        link: middleBannerFormData.link || 'shop'
+      });
+      setMiddleBanner(middleBannerFormData);
+      setShowMiddleBannerModal(false);
+      showToast('Middle banner updated successfully!', 'success');
+      if (onRefreshMiddleBanner) onRefreshMiddleBanner();
+    } catch (err) {
+      console.error('Error saving middle banner:', err);
+      showToast('Failed to save middle banner', 'error');
     }
   };
 
@@ -5396,24 +5662,34 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
               <div className="bg-white p-6 rounded-xl shadow-sm border border-zinc-100">
                 <form onSubmit={(e) => {
                   e.preventDefault();
-                  const newCat = (e.target as any).category.value;
-                  if (newCat && !categories.includes(newCat)) {
-                    setCategories([...categories, newCat]);
-                    (e.target as any).category.value = '';
+                  const input = (e.target as any).category;
+                  const newCat = input ? input.value : '';
+                  if (newCat) {
+                    handleAddCategory(newCat);
+                    if (input) input.value = '';
                   }
                 }} className="flex gap-4 mb-8">
-                  <input name="category" placeholder="New Category Name" className="flex-grow border-b border-zinc-200 py-2 outline-none focus:border-zinc-900" />
-                  <button type="submit" className="btn-primary px-6 py-2 text-xs">Add</button>
+                  <input name="category" placeholder="New Category Name" className="flex-grow border-b border-zinc-200 py-2 outline-none focus:border-zinc-900 text-sm" />
+                  <button type="submit" className="btn-primary px-6 py-2 text-xs uppercase tracking-wider font-semibold">ADD</button>
                 </form>
                 <div className="space-y-2">
-                  {categories.map(cat => (
-                    <div key={cat} className="flex justify-between items-center p-3 bg-zinc-50 rounded-lg">
-                      <span className="text-sm font-medium">{cat}</span>
-                      <button onClick={() => setCategories(categories.filter(c => c !== cat))} className="text-red-500 hover:text-red-700">
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  ))}
+                  {categories.length === 0 ? (
+                    <p className="text-xs text-zinc-400 py-4 text-center">No categories found. Add one above.</p>
+                  ) : (
+                    categories.map(cat => (
+                      <div key={cat} className="flex justify-between items-center p-3 bg-zinc-50 rounded-lg hover:bg-zinc-100/60 transition-colors">
+                        <span className="text-sm font-medium text-zinc-800">{cat}</span>
+                        <button 
+                          type="button"
+                          onClick={() => handleDeleteCategory(cat)} 
+                          className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors cursor-pointer"
+                          title={`Delete ${cat}`}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -6254,6 +6530,212 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
                   </div>
                 ))}
               </div>
+
+              {/* Middle Campaign Banner Section (Below Top Rated Products) */}
+              <div className="mt-12 pt-8 border-t border-zinc-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                  <div>
+                    <h3 className="text-xl font-serif font-bold text-zinc-900">
+                      Middle Banner (Below Top Rated Products)
+                    </h3>
+                    <p className="text-xs text-zinc-500 mt-1">
+                      Exact same size as hero banner (Desktop 1920×700 px, Mobile 800×900 px).
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setMiddleBannerFormData(middleBanner);
+                      setShowMiddleBannerModal(true);
+                    }}
+                    className="btn-primary py-2.5 px-6 text-xs flex items-center gap-2 self-start sm:self-auto"
+                  >
+                    <Edit size={16} /> Edit Middle Banner
+                  </button>
+                </div>
+
+                <div className="bg-white border border-zinc-100 p-5 rounded-2xl shadow-sm">
+                  <div className="relative aspect-[1920/700] overflow-hidden rounded-xl mb-4 bg-zinc-900">
+                    <img 
+                      src={middleBanner.image || middleBanner.mobile_image} 
+                      alt="Middle Banner Preview" 
+                      className="w-full h-full object-cover" 
+                      referrerPolicy="no-referrer" 
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10 flex flex-col items-center justify-center text-center p-6">
+                      {middleBanner.title && (
+                        <h4 className="text-white text-xl sm:text-2xl font-serif font-bold mb-1 drop-shadow">
+                          {middleBanner.title}
+                        </h4>
+                      )}
+                      {middleBanner.subtitle && (
+                        <p className="text-white/80 text-xs sm:text-sm max-w-lg mb-3">
+                          {middleBanner.subtitle}
+                        </p>
+                      )}
+                      {middleBanner.buttonText && (
+                        <span className="px-5 py-2 rounded-full bg-[#cfa83b] text-[#111827] font-bold text-[11px] uppercase tracking-wider">
+                          {middleBanner.buttonText}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-amber-50 text-amber-800 text-[10px] font-bold px-2.5 py-1 rounded-md border border-amber-200/60">
+                        Desktop 1920×700
+                      </span>
+                      <span className="bg-blue-50 text-blue-800 text-[10px] font-bold px-2.5 py-1 rounded-md border border-blue-200/60">
+                        Mobile 800×900
+                      </span>
+                      <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2.5 py-1 rounded-md border border-emerald-200/60">
+                        Active on Homepage
+                      </span>
+                    </div>
+                    {middleBanner.link && (
+                      <span className="text-zinc-500">
+                        Target: <span className="font-semibold text-zinc-700">{middleBanner.link}</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Middle Banner Edit Modal */}
+              {showMiddleBannerModal && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+                  <div className="bg-white rounded-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 shadow-2xl">
+                    <div className="flex justify-between items-center mb-6">
+                      <div>
+                        <h3 className="text-xl font-serif font-bold text-zinc-900">
+                          Edit Middle Banner
+                        </h3>
+                        <p className="text-xs text-zinc-500 mt-0.5">
+                          Appears right below Top Rated Products section.
+                        </p>
+                      </div>
+                      <button 
+                        onClick={() => setShowMiddleBannerModal(false)}
+                        className="p-1.5 text-zinc-400 hover:text-zinc-700 rounded-full hover:bg-zinc-100"
+                      >
+                        <X size={20} />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleSaveMiddleBanner} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">
+                          Desktop Image (Recommended 1920 × 700 px)
+                        </label>
+                        <div className="flex gap-2">
+                          <input 
+                            className="flex-1 border-b border-zinc-200 py-2 outline-none focus:border-zinc-900 text-sm" 
+                            value={middleBannerFormData.image} 
+                            onChange={e => setMiddleBannerFormData({ ...middleBannerFormData, image: e.target.value })} 
+                            placeholder="https://images.unsplash.com/..." 
+                          />
+                          <label className="btn-outline py-2 px-3 text-xs cursor-pointer flex items-center gap-1 shrink-0">
+                            <Upload size={14} /> Upload
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              className="hidden" 
+                              onChange={e => handleFileUpload(e, 'middle_banner')} 
+                            />
+                          </label>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">
+                          Mobile Image (Recommended 800 × 900 px - Optional)
+                        </label>
+                        <div className="flex gap-2">
+                          <input 
+                            className="flex-1 border-b border-zinc-200 py-2 outline-none focus:border-zinc-900 text-sm" 
+                            value={middleBannerFormData.mobile_image || ''} 
+                            onChange={e => setMiddleBannerFormData({ ...middleBannerFormData, mobile_image: e.target.value })} 
+                            placeholder="Optional separate mobile image URL" 
+                          />
+                          <label className="btn-outline py-2 px-3 text-xs cursor-pointer flex items-center gap-1 shrink-0">
+                            <Upload size={14} /> Upload
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              className="hidden" 
+                              onChange={e => handleFileUpload(e, 'middle_banner_mobile')} 
+                            />
+                          </label>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Title</label>
+                        <input 
+                          className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900 text-sm" 
+                          value={middleBannerFormData.title || ''} 
+                          onChange={e => setMiddleBannerFormData({ ...middleBannerFormData, title: e.target.value })} 
+                          placeholder="E.g. CRAFTED FOR DISTINCTION" 
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Subtitle</label>
+                        <input 
+                          className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900 text-sm" 
+                          value={middleBannerFormData.subtitle || ''} 
+                          onChange={e => setMiddleBannerFormData({ ...middleBannerFormData, subtitle: e.target.value })} 
+                          placeholder="Short description or tagline" 
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Button Text</label>
+                          <input 
+                            className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900 text-sm" 
+                            value={middleBannerFormData.buttonText || ''} 
+                            onChange={e => setMiddleBannerFormData({ ...middleBannerFormData, buttonText: e.target.value })} 
+                            placeholder="SHOP NOW" 
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Link / Target Page</label>
+                          <input 
+                            className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900 text-sm" 
+                            value={middleBannerFormData.link || ''} 
+                            onChange={e => setMiddleBannerFormData({ ...middleBannerFormData, link: e.target.value })} 
+                            placeholder="shop" 
+                          />
+                        </div>
+                      </div>
+
+                      {isUploading && (
+                        <div className="text-center py-2 text-xs text-amber-600 font-medium animate-pulse">
+                          Uploading image, please wait...
+                        </div>
+                      )}
+
+                      <div className="flex gap-3 pt-4">
+                        <button 
+                          type="button" 
+                          onClick={() => setShowMiddleBannerModal(false)}
+                          className="flex-1 py-3 border border-zinc-200 text-zinc-600 text-xs font-bold uppercase tracking-widest rounded-xl hover:bg-zinc-50"
+                        >
+                          Cancel
+                        </button>
+                        <button 
+                          type="submit" 
+                          disabled={isUploading}
+                          className="flex-1 btn-primary py-3 text-xs"
+                        >
+                          Save Changes
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -6480,15 +6962,6 @@ const Footer = ({ onNavigate }: { onNavigate: (page: string) => void }) => {
                     Returns & Exchange
                   </button>
                 </li>
-                <li className="pt-2">
-                  <button 
-                    onClick={() => onNavigate('admin')} 
-                    className="flex items-center gap-2 text-amber-400 hover:text-amber-300 font-bold text-xs uppercase tracking-wider transition-colors"
-                  >
-                    <span>🔒</span>
-                    <span>Admin Portal</span>
-                  </button>
-                </li>
               </ul>
             </div>
           </div>
@@ -6603,9 +7076,29 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState(() => localStorage.getItem('elegan_page') || 'home');
   const [products, setProducts] = useState<Product[]>([]);
   const [banners, setBanners] = useState<Banner[]>([]);
+  const defaultMiddleBanner: Banner = {
+    id: 'default_middle_banner',
+    image: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=1920&h=700',
+    mobile_image: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=800&h=900',
+    title: 'CRAFTED FOR DISTINCTION',
+    subtitle: 'Discover our signature tailored formal wear designed for modern elegance.',
+    buttonText: 'SHOP NOW',
+    link: 'shop'
+  };
+  const [middleBanner, setMiddleBanner] = useState<Banner>(defaultMiddleBanner);
   const [topRatedOfferImage, setTopRatedOfferImage] = useState('');
   const [heroVideo, setHeroVideo] = useState('https://assets.mixkit.co/videos/preview/mixkit-man-in-a-suit-walking-slowly-4848-large.mp4');
   const [heroImage, setHeroImage] = useState('https://i.imgur.com/Vriu71z.png');
+  const [categories, setCategories] = useState<string[]>(() => {
+    const saved = localStorage.getItem('elegan_product_categories');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return ['Formal Pant', 'Formal Shirt', 'Blazer', 'Office Wear', 'Premium Collection', 'Best Seller', 'Cuban Shirt'];
+  });
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [minPrice, setMinPrice] = useState<string>('');
@@ -6745,6 +7238,38 @@ export default function App() {
       stock: 50
     },
     {
+      id: 'default_black_pant',
+      name: "Jet Black Executive Formal Pant",
+      price: 1250,
+      originalPrice: 1850,
+      image: "https://images.unsplash.com/photo-1479064555552-3ef4979f8908?q=80&w=1000&auto=format&fit=crop",
+      category: "Formal Pant",
+      rating: 4.9,
+      reviews: 136,
+      fabric: "Premium Tropical",
+      fit: "Slim Fit",
+      description: "Classic deep black formal pant with refined tailoring.",
+      sizes: ["28", "30", "32", "34", "36", "38", "40"],
+      colors: ["Black"],
+      stock: 60
+    },
+    {
+      id: 'default_beige_pant',
+      name: "Cream Khaki Formal Pant",
+      price: 1250,
+      originalPrice: 1850,
+      image: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?q=80&w=1000&auto=format&fit=crop",
+      category: "Formal Pant",
+      rating: 4.8,
+      reviews: 94,
+      fabric: "Cotton Blend",
+      fit: "Slim Fit",
+      description: "Sophisticated khaki formal pant for versatile styling.",
+      sizes: ["28", "30", "32", "34", "36", "38", "40"],
+      colors: ["Khaki", "Beige"],
+      stock: 40
+    },
+    {
       id: 'default_black_shirt',
       name: "Midnight Black Formal Shirt",
       price: 1650,
@@ -6878,12 +7403,44 @@ export default function App() {
     }
   };
 
+  const fetchCategories = async () => {
+    try {
+      const docSnap = await getDoc(doc(db, 'settings', 'product_categories'));
+      if (docSnap.exists() && docSnap.data().value) {
+        const parsed = JSON.parse(docSnap.data().value);
+        if (Array.isArray(parsed)) {
+          setCategories(parsed);
+          localStorage.setItem('elegan_product_categories', JSON.stringify(parsed));
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Firestore fetch categories notice:', err);
+    }
+  };
+
+  const fetchMiddleBanner = async () => {
+    try {
+      const docSnap = await getDoc(doc(db, 'settings', 'middle_banner'));
+      if (docSnap.exists() && docSnap.data().image) {
+        setMiddleBanner({ id: 'middle_banner', ...docSnap.data() } as Banner);
+      } else {
+        setMiddleBanner(defaultMiddleBanner);
+      }
+    } catch (err) {
+      console.warn('Firestore fetch middle banner notice:', err);
+      setMiddleBanner(defaultMiddleBanner);
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
     fetchBanners();
+    fetchMiddleBanner();
     fetchPromoImage();
     fetchHeroVideo();
     fetchHeroImage();
+    fetchCategories();
 
     const splashTimer = setTimeout(() => {
       setShowSplash(false);
@@ -6986,6 +7543,7 @@ export default function App() {
         onRefreshPromoImage={fetchPromoImage}
         onRefreshHeroVideo={fetchHeroVideo}
         onRefreshHeroImage={fetchHeroImage}
+        onRefreshCategories={fetchCategories}
         showToast={showToast}
       />
     );
@@ -7175,6 +7733,7 @@ export default function App() {
         user={user}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
+        categories={categories}
         onSelectCategory={(category) => {
           setSelectedCategory(category);
           handleNavigate('shop');
@@ -7188,18 +7747,21 @@ export default function App() {
             <TrustFeatureBadges />
 
             <FeaturedCollection 
+              title="EXPLORE OUR PANT COLLECTION"
               products={products}
               onSelect={handleProductSelect}
               user={user}
               onToggleWishlist={handleToggleWishlist}
+              categories={categories}
+              filterType="pant"
             />
 
             {/* Top Rated Products Section */}
-            <section className="py-16 md:py-32 bg-white">
+            <section className="pt-2 sm:pt-4 pb-14 md:pb-20 bg-white">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="text-center mb-12 md:mb-20">
-                  <h2 className="text-3xl md:text-6xl font-serif font-bold text-zinc-900 mb-6 tracking-tight">Top Rated Products</h2>
-                  <p className="max-w-2xl mx-auto text-zinc-500 text-sm md:text-lg leading-relaxed">
+                <div className="text-center mb-8 sm:mb-12">
+                  <h2 className="text-3xl md:text-5xl font-serif font-bold text-zinc-900 mb-3 sm:mb-4 tracking-tight">Top Rated Products</h2>
+                  <p className="max-w-2xl mx-auto text-zinc-500 text-sm md:text-base leading-relaxed">
                     আমাদের গ্রাহকদের সবচেয়ে পছন্দের এবং সর্বোচ্চ রেটিং প্রাপ্ত প্রোডাক্টগুলো দেখে নিন।
                   </p>
                 </div>
@@ -7213,6 +7775,20 @@ export default function App() {
                 />
               </div>
             </section>
+
+            {/* Middle Campaign Banner (Below Top Rated Products) */}
+            <MiddleBanner banner={middleBanner} onNavigate={handleNavigate} />
+
+            {/* Shirt Collection Section (Below Middle Banner) */}
+            <FeaturedCollection 
+              title="EXPLORE OUR SHIRT COLLECTION"
+              products={products}
+              onSelect={handleProductSelect}
+              user={user}
+              onToggleWishlist={handleToggleWishlist}
+              categories={categories}
+              filterType="shirt"
+            />
 
             {/* Trust Section */}
             <section className="py-20 md:py-32 bg-white">
@@ -7271,9 +7847,9 @@ export default function App() {
                     onChange={(e) => setSelectedCategory(e.target.value)}
                   >
                     <option value="">All Categories</option>
-                    <option value="Formal Pant">Formal Pant</option>
-                    <option value="Formal Shirt">Formal Shirt</option>
-                    <option value="Blazer">Blazer</option>
+                    {categories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="flex flex-col gap-2 w-full sm:w-[150px]">
@@ -7419,6 +7995,8 @@ export default function App() {
             onRefreshPromoImage={fetchPromoImage}
             onRefreshHeroVideo={fetchHeroVideo}
             onRefreshHeroImage={fetchHeroImage}
+            onRefreshCategories={fetchCategories}
+            onRefreshMiddleBanner={fetchMiddleBanner}
             showToast={showToast}
           />
         )}

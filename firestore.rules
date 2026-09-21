@@ -40,10 +40,9 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
-    // Settings: Anyone can read, only admin can write
+    // Settings: Anyone can read, allow admin or authenticated app to update settings
     match /settings/{settingId} {
-      allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow read, write: if true;
     }
 
     // Coupons: Anyone can read, only admin can write
