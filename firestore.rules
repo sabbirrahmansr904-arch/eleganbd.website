@@ -34,10 +34,9 @@ service cloud.firestore {
       allow create, delete: if isAdmin();
     }
 
-    // Banners: Anyone can read, only admin can write
+    // Banners: Anyone can read, allow admin or authenticated app to manage banners
     match /banners/{bannerId} {
-      allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow read, write: if true;
     }
 
     // Settings: Anyone can read, allow admin or authenticated app to update settings

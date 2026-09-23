@@ -3236,20 +3236,35 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
           setLoading(false);
         });
       } else if (activeTab === 'banners') {
-        fetchBannersFromSupabase().then(res => {
-          if (res && res.length > 0) {
-            setBanners(res);
-            try { localStorage.setItem('elegan_banners', JSON.stringify(res)); } catch (e) {}
-          } else {
+        const loadAdminBanners = async () => {
+          try {
+            const bSnap = await getDocs(collection(db, 'banners'));
+            if (bSnap && !bSnap.empty && bSnap.docs.length > 0) {
+              const loaded = bSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Banner[];
+              setBanners(loaded);
+              try { localStorage.setItem('elegan_banners', JSON.stringify(loaded)); } catch (e) {}
+              setLoading(false);
+              return;
+            }
+          } catch (fErr) {
+            console.warn('Firestore banners admin notice:', fErr);
+          }
+          fetchBannersFromSupabase().then(res => {
+            if (res && res.length > 0) {
+              setBanners(res);
+              try { localStorage.setItem('elegan_banners', JSON.stringify(res)); } catch (e) {}
+            } else {
+              const saved = localStorage.getItem('elegan_banners');
+              if (saved) { try { setBanners(JSON.parse(saved)); } catch (e) {} }
+            }
+            setLoading(false);
+          }).catch(() => {
             const saved = localStorage.getItem('elegan_banners');
             if (saved) { try { setBanners(JSON.parse(saved)); } catch (e) {} }
-          }
-          setLoading(false);
-        }).catch(() => {
-          const saved = localStorage.getItem('elegan_banners');
-          if (saved) { try { setBanners(JSON.parse(saved)); } catch (e) {} }
-          setLoading(false);
-        });
+            setLoading(false);
+          });
+        };
+        loadAdminBanners();
       } else if (activeTab === 'coupons') {
         fetchCouponsFromSupabase().then(res => {
           if (res && res.length > 0) {
