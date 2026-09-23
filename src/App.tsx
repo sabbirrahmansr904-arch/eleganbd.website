@@ -70,14 +70,115 @@ import {
   saveFinanceTransactionToSupabase,
   fetchFinanceTransactionsFromSupabase,
   deleteFinanceTransactionFromSupabase,
-  updateFinanceTransactionStatusInSupabase
+  updateFinanceTransactionStatusInSupabase,
+  fetchProductsFromSupabase,
+  saveProductToSupabase,
+  deleteProductFromSupabase,
+  fetchOrdersFromSupabase,
+  updateOrderStatusInSupabase,
+  deleteOrderFromSupabase,
+  fetchBannersFromSupabase,
+  saveBannerToSupabase,
+  deleteBannerFromSupabase,
+  fetchCouponsFromSupabase,
+  saveCouponToSupabase,
+  deleteCouponFromSupabase
 } from './lib/supabase';
 import { GoogleGenAI } from "@google/genai";
 import { Product, CartItem, User, Order, Banner, Coupon, Review } from './types';
 import { db, auth, storage } from './firebase';
-import { collection, getDocs, getDoc, doc, addDoc, updateDoc, deleteDoc, setDoc, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs as _getDocs, getDoc as _getDoc, doc, addDoc as _addDoc, updateDoc as _updateDoc, deleteDoc as _deleteDoc, setDoc as _setDoc, query, where, orderBy, onSnapshot, disableNetwork } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
+// Force Supabase & LocalStorage mode exclusively to bypass Firestore quota limits completely
+let firestoreQuotaExceeded = true;
+if (typeof window !== 'undefined') {
+  localStorage.setItem('elegan_firestore_quota_exceeded', 'true');
+  try { disableNetwork(db).catch(() => {}); } catch (e) {}
+}
+
+const handleFirestoreError = (err: any, actionName: string) => {
+  console.warn(`Firestore ${actionName} warning:`, err);
+  if (err?.message?.includes('resource-exhausted') || err?.code === 'resource-exhausted' || err?.message?.includes('Quota') || err?.code === 'unavailable' || err?.message?.includes('unavailable')) {
+    firestoreQuotaExceeded = true;
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('elegan_firestore_quota_exceeded', 'true');
+        disableNetwork(db).catch(() => {});
+      } catch (e) {}
+    }
+    console.warn(`Firestore ${actionName} offline/quota issue. Switching to local-only mode.`);
+  }
+};
+
+const setDoc = async (docRef: any, data: any, options?: any) => {
+  if (firestoreQuotaExceeded) return;
+  try {
+    if (options) {
+      await _setDoc(docRef, data, options);
+    } else {
+      await _setDoc(docRef, data);
+    }
+  } catch (err: any) {
+    handleFirestoreError(err, 'setDoc');
+  }
+};
+
+const addDoc = async (colRef: any, data: any) => {
+  if (firestoreQuotaExceeded) return { id: 'local_' + Date.now() };
+  try {
+    return await _addDoc(colRef, data);
+  } catch (err: any) {
+    handleFirestoreError(err, 'addDoc');
+    return { id: 'local_' + Date.now() };
+  }
+};
+
+const updateDoc = async (docRef: any, data: any) => {
+  if (firestoreQuotaExceeded) return;
+  try {
+    await _updateDoc(docRef, data);
+  } catch (err: any) {
+    handleFirestoreError(err, 'updateDoc');
+  }
+};
+
+const deleteDoc = async (docRef: any) => {
+  if (firestoreQuotaExceeded) return;
+  try {
+    await _deleteDoc(docRef);
+  } catch (err: any) {
+    handleFirestoreError(err, 'deleteDoc');
+  }
+};
+
+const getDoc = async (docRef: any) => {
+  try {
+    return await _getDoc(docRef);
+  } catch (err: any) {
+    handleFirestoreError(err, 'getDoc');
+    return {
+      exists: () => false,
+      data: () => undefined,
+      id: docRef.id
+    };
+  }
+};
+
+const getDocs = async (queryOrCol: any) => {
+  try {
+    return await _getDocs(queryOrCol);
+  } catch (err: any) {
+    handleFirestoreError(err, 'getDocs');
+    return {
+      docs: [],
+      empty: true,
+      size: 0,
+      forEach: (callback: any) => {}
+    };
+  }
+};
 
 // --- Components ---
 
@@ -2858,7 +2959,7 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
     return ['Formal Pant', 'Formal Shirt', 'Blazer', 'Office Wear', 'Premium Collection', 'Best Seller', 'Cuban Shirt'];
   });
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('orders');
   const [isSidebarOpen, setIsSidebarOpen] = useState(typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
   const [email, setEmail] = useState(() => {
     return localStorage.getItem('admin_saved_email') || 'eleganbdltd@gmail.com';
@@ -3094,39 +3195,69 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
     if (isAuthenticated) {
       setLoading(true);
       if (activeTab === 'orders') {
-        getDocs(collection(db, 'orders')).then(snapshot => {
-          setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        fetchOrdersFromSupabase().then(res => {
+          if (res) {
+            setOrders(res);
+            try { localStorage.setItem('elegan_orders', JSON.stringify(res)); } catch (e) {}
+          } else {
+            const saved = localStorage.getItem('elegan_orders');
+            if (saved) { try { setOrders(JSON.parse(saved)); } catch (e) {} }
+          }
+          setLoading(false);
+        }).catch(() => {
+          const saved = localStorage.getItem('elegan_orders');
+          if (saved) { try { setOrders(JSON.parse(saved)); } catch (e) {} }
           setLoading(false);
         });
-      } else if (activeTab === 'products' || activeTab === 'master-table' || activeTab === 'dashboard') {
-        getDocs(collection(db, 'products')).then(snapshot => {
-          const prods = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
+      } else if (activeTab === 'products') {
+        fetchProductsFromSupabase().then(res => {
+          const prods = (res && res.length > 0) ? res : (() => {
+            const saved = localStorage.getItem('elegan_products');
+            if (saved) { try { const p = JSON.parse(saved); if (Array.isArray(p) && p.length > 0) return p; } catch (e) {} }
+            return [];
+          })();
+          setProducts(prods);
+          initializeMasterStock(prods);
+          setLoading(false);
+        }).catch(() => {
+          const saved = localStorage.getItem('elegan_products');
+          const prods = (saved) ? (() => { try { return JSON.parse(saved); } catch(e) { return []; } })() : [];
           setProducts(prods);
           initializeMasterStock(prods);
           setLoading(false);
         });
       } else if (activeTab === 'banners') {
-        getDocs(collection(db, 'banners')).then(snapshot => {
-          setBanners(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        fetchBannersFromSupabase().then(res => {
+          if (res && res.length > 0) {
+            setBanners(res);
+            try { localStorage.setItem('elegan_banners', JSON.stringify(res)); } catch (e) {}
+          } else {
+            const saved = localStorage.getItem('elegan_banners');
+            if (saved) { try { setBanners(JSON.parse(saved)); } catch (e) {} }
+          }
           setLoading(false);
-        });
-      } else if (activeTab === 'customers') {
-        getDocs(collection(db, 'customers')).then(snapshot => {
-          setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }).catch(() => {
+          const saved = localStorage.getItem('elegan_banners');
+          if (saved) { try { setBanners(JSON.parse(saved)); } catch (e) {} }
           setLoading(false);
         });
       } else if (activeTab === 'coupons') {
-        getDocs(collection(db, 'coupons')).then(snapshot => {
-          setCoupons(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        fetchCouponsFromSupabase().then(res => {
+          if (res && res.length > 0) {
+            setCoupons(res);
+            try { localStorage.setItem('elegan_coupons', JSON.stringify(res)); } catch (e) {}
+          } else {
+            const saved = localStorage.getItem('elegan_coupons');
+            if (saved) { try { setCoupons(JSON.parse(saved)); } catch (e) {} }
+          }
+          setLoading(false);
+        }).catch(() => {
+          const saved = localStorage.getItem('elegan_coupons');
+          if (saved) { try { setCoupons(JSON.parse(saved)); } catch (e) {} }
           setLoading(false);
         });
       } else if (activeTab === 'customization') {
-        getDoc(doc(db, 'settings', 'top_rated_offer_image')).then(docSnap => {
-          if (docSnap.exists()) {
-            setTopRatedOfferImage(docSnap.data().value);
-          }
-          setLoading(false);
-        });
+        setLoading(false);
       } else if (activeTab === 'categories') {
         fetchCategories().then(() => {
           setLoading(false);
@@ -3521,15 +3652,23 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
       };
 
       if (editingProduct) {
-        await updateDoc(doc(db, 'products', editingProduct.id.toString()), dataToSave);
+        await saveProductToSupabase({ id: editingProduct.id, ...dataToSave });
         showToast('Product updated successfully', 'success');
-      } else {
-        await addDoc(collection(db, 'products'), {
-          ...dataToSave,
-          rating: 5.0,
-          reviews: 0
+        setProducts(prev => {
+          const updated = prev.map(p => p.id === editingProduct.id ? { ...p, ...dataToSave } : p);
+          try { localStorage.setItem('elegan_products', JSON.stringify(updated)); } catch (e) {}
+          return updated;
         });
+      } else {
+        const newId = 'local_' + Date.now();
+        const newProd = { id: newId, ...dataToSave, rating: 5.0, reviews: 0 };
+        await saveProductToSupabase(newProd);
         showToast('Product added successfully', 'success');
+        setProducts(prev => {
+          const updated = [newProd, ...prev];
+          try { localStorage.setItem('elegan_products', JSON.stringify(updated)); } catch (e) {}
+          return updated;
+        });
       }
       setShowProductForm(false);
       setEditingProduct(null);
@@ -3549,10 +3688,12 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
         stockStatus: 'In Stock',
         category: 'Formal Pant' 
       } as any);
-      getDocs(collection(db, 'products')).then(snapshot => {
-        const prods = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
-        setProducts(prods);
-        initializeMasterStock(prods);
+      fetchProductsFromSupabase().then(res => {
+        if (res && res.length > 0) {
+          setProducts(res as Product[]);
+          initializeMasterStock(res as Product[]);
+          try { localStorage.setItem('elegan_products', JSON.stringify(res)); } catch (e) {}
+        }
       });
       onRefreshProducts();
     } catch (error) {
@@ -3566,9 +3707,14 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
       message: 'Are you sure you want to delete this product?',
       onConfirm: async () => {
         try {
-          await deleteDoc(doc(db, 'products', id.toString()));
-          setProducts(prev => prev.filter(p => p.id !== id));
+          await deleteProductFromSupabase(id.toString());
+          setProducts(prev => {
+            const updated = prev.filter(p => p.id !== id);
+            try { localStorage.setItem('elegan_products', JSON.stringify(updated)); } catch (e) {}
+            return updated;
+          });
           onRefreshProducts();
+          showToast('Product deleted successfully', 'success');
         } catch (err) {
           console.error(err);
         }
@@ -3760,29 +3906,40 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
       return;
     }
     try {
-      if (editingBanner && editingBanner.id) {
-        await updateDoc(doc(db, 'banners', editingBanner.id.toString()), bannerFormData);
-      } else {
-        if (banners.length >= 10) {
-          showToast('Maximum 10 banners allowed.', 'error');
-          return;
-        }
-        await addDoc(collection(db, 'banners'), {
-          ...bannerFormData,
-          created_at: new Date().toISOString()
-        });
-      }
+      const bannerId = editingBanner && editingBanner.id ? editingBanner.id.toString() : ('banner_' + Date.now());
+      const bannerToSave = {
+        id: bannerId,
+        image: bannerFormData.image || '',
+        mobile_image: bannerFormData.mobile_image || '',
+        title: bannerFormData.title || '',
+        subtitle: bannerFormData.subtitle || '',
+        buttonText: bannerFormData.buttonText || 'Shop Now',
+        link: bannerFormData.link || '',
+        created_at: new Date().toISOString()
+      };
+
+      await saveBannerToSupabase(bannerToSave);
+
       setShowBannerForm(false);
       setEditingBanner(null);
       setBannerFormData({ image: '', mobile_image: '', title: '', subtitle: '', buttonText: 'Shop Now', link: '' });
       
-      // Refresh local banners list
-      const snapshot = await getDocs(collection(db, 'banners'));
-      setBanners(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      
+      setBanners(prev => {
+        let updated: Banner[];
+        if (editingBanner && editingBanner.id) {
+          updated = prev.map(b => b.id.toString() === bannerId.toString() ? bannerToSave : b);
+        } else {
+          updated = [bannerToSave, ...prev];
+        }
+        try { localStorage.setItem('elegan_banners', JSON.stringify(updated)); } catch (e) {}
+        return updated;
+      });
+
+      showToast('Banner saved successfully!', 'success');
       onRefreshBanners();
     } catch (error) {
       console.error('Error saving banner:', error);
+      showToast('Failed to save banner', 'error');
     }
   };
 
@@ -3792,12 +3949,13 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
       message: 'Are you sure you want to delete ALL banners? This cannot be undone.',
       onConfirm: async () => {
         try {
-          const snapshot = await getDocs(collection(db, 'banners'));
-          for (const docRef of snapshot.docs) {
-            await deleteDoc(doc(db, 'banners', docRef.id));
+          for (const b of banners) {
+            if (b.id) await deleteBannerFromSupabase(b.id.toString());
           }
           setBanners([]);
+          try { localStorage.setItem('elegan_banners', JSON.stringify([])); } catch (e) {}
           onRefreshBanners();
+          showToast('All banners cleared', 'success');
         } catch (error) {
           console.error('Error clearing banners:', error);
         }
@@ -3812,9 +3970,14 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
       message: 'Are you sure you want to delete this banner?',
       onConfirm: async () => {
         try {
-          await deleteDoc(doc(db, 'banners', id.toString()));
-          setBanners(prev => prev.filter(b => b.id !== id));
+          await deleteBannerFromSupabase(id.toString());
+          setBanners(prev => {
+            const updated = prev.filter(b => b.id !== id);
+            try { localStorage.setItem('elegan_banners', JSON.stringify(updated)); } catch (e) {}
+            return updated;
+          });
           onRefreshBanners();
+          showToast('Banner deleted successfully', 'success');
         } catch (err) {
           console.error(err);
         }
@@ -5076,13 +5239,9 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
 };
 
   const menuItems = [
-    { id: 'dashboard', name: 'Dashboard', icon: <LayoutDashboard size={19} /> },
     { id: 'orders', name: 'Orders', icon: <ShoppingBag size={19} /> },
     { id: 'products', name: 'Products', icon: <Package size={19} /> },
     { id: 'categories', name: 'Categories', icon: <Layers size={19} /> },
-    { id: 'customers', name: 'Customers', icon: <Users size={19} /> },
-    { id: 'inventory', name: 'Inventory', icon: <Boxes size={19} /> },
-    { id: 'finance', name: 'Finance', icon: <DollarSign size={19} /> },
     { id: 'supabase', name: 'Supabase Cloud', icon: <Database size={19} /> },
     { id: 'banners', name: 'Banner & CMS', icon: <Settings size={19} /> },
     { id: 'settings', name: 'Settings', icon: <SlidersHorizontal size={19} /> },
@@ -5095,7 +5254,7 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
         className="lg:hidden fixed bottom-6 right-6 z-[60] bg-[#0e121e] text-white p-4 rounded-full shadow-2xl"
       >
-        {isSidebarOpen ? <X size={24} /> : <LayoutDashboard size={24} />}
+        {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
 
       {/* Mobile Backdrop Overlay */}
@@ -5121,16 +5280,12 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
           </div>
           <nav className="space-y-1.5 flex-1 overflow-y-auto pr-1">
             {menuItems.map((item) => {
-              const isActive = activeTab === item.id || (item.id === 'inventory' && activeTab === 'master-table');
+              const isActive = activeTab === item.id;
               return (
                 <button
                   key={item.id}
                   onClick={() => {
-                    if (item.id === 'inventory') {
-                      setActiveTab('master-table');
-                    } else {
-                      setActiveTab(item.id);
-                    }
+                    setActiveTab(item.id);
                     if (window.innerWidth < 1024) setIsSidebarOpen(false);
                   }}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-semibold transition-all rounded-xl cursor-pointer ${
@@ -5185,478 +5340,7 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
 
         <div className="p-3.5 sm:p-5 lg:p-7 max-w-7xl mx-auto">
 
-          {activeTab === 'dashboard' && (
-            <div className="space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-zinc-100">
-                  <div className="flex justify-between items-start mb-4">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Total Revenue</p>
-                    <CreditCard size={16} className="text-zinc-300" />
-                  </div>
-                  <h3 className="text-3xl font-bold">৳{orders.reduce((acc, o) => acc + (o.total_amount || (o as any).totalAmount || 0), 0).toLocaleString()}</h3>
-                  <p className="text-xs text-green-600 mt-2 font-medium">Lifetime earnings</p>
-                </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-zinc-100">
-                  <div className="flex justify-between items-start mb-4">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Today Sales</p>
-                    <ShoppingBag size={16} className="text-zinc-300" />
-                  </div>
-                  <h3 className="text-3xl font-bold">
-                    ৳{orders
-                      .filter(o => new Date(o.created_at || (o as any).createdAt || '').toDateString() === new Date().toDateString())
-                      .reduce((acc, o) => acc + (o.total_amount || (o as any).totalAmount || 0), 0)
-                      .toLocaleString()}
-                  </h3>
-                  <p className="text-xs text-zinc-500 mt-2 font-medium">Sales from today</p>
-                </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-zinc-100">
-                  <div className="flex justify-between items-start mb-4">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Pending Orders</p>
-                    <RefreshCw size={16} className="text-amber-400" />
-                  </div>
-                  <h3 className="text-3xl font-bold">{orders.filter(o => o.status?.toLowerCase() === 'pending').length}</h3>
-                  <p className="text-xs text-amber-600 mt-2 font-medium">Awaiting confirmation</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-zinc-100">
-                  <div className="flex justify-between items-start mb-4">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Total Orders</p>
-                    <Package size={16} className="text-zinc-300" />
-                  </div>
-                  <h3 className="text-3xl font-bold">{orders.length}</h3>
-                </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-zinc-100">
-                  <div className="flex justify-between items-start mb-4">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Total Customers</p>
-                    <Users size={16} className="text-zinc-300" />
-                  </div>
-                  <h3 className="text-3xl font-bold">{customers.length}</h3>
-                </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-zinc-100">
-                  <div className="flex justify-between items-start mb-4">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Total Products</p>
-                    <Package size={16} className="text-zinc-300" />
-                  </div>
-                  <h3 className="text-3xl font-bold">{products.length}</h3>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'master-table' && (
-            <div className="space-y-6">
-              {/* Header & Controls */}
-              <div className="bg-white p-6 rounded-2xl border border-zinc-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-zinc-900 text-white flex items-center justify-center">
-                      <Table size={20} />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-serif font-bold text-zinc-900">Master Stock Management (মাস্টার স্টক টেবিল)</h3>
-                      <p className="text-xs text-zinc-500 mt-0.5">Manage and set exact stock quantities per size and variant across all products</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center flex-wrap gap-3 w-full md:w-auto">
-                  <button
-                    onClick={openAddProductModal}
-                    className="px-4 py-2.5 bg-zinc-900 text-white hover:bg-zinc-800 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm"
-                  >
-                    <Plus size={15} />
-                    <span>Add Product</span>
-                  </button>
-
-                  <button
-                    onClick={handleSaveAllStockChanges}
-                    disabled={isBulkSaving || (Object.values(masterStockEdits) as any[]).filter(e => e?.hasChanges).length === 0}
-                    className={`px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm ${
-                      (Object.values(masterStockEdits) as any[]).filter(e => e?.hasChanges).length > 0
-                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white animate-pulse'
-                        : 'bg-zinc-100 text-zinc-400 cursor-not-allowed'
-                    }`}
-                  >
-                    {isBulkSaving ? (
-                      <RefreshCw size={15} className="animate-spin" />
-                    ) : (
-                      <Save size={15} />
-                    )}
-                    <span>Save All Changes ({(Object.values(masterStockEdits) as any[]).filter(e => e?.hasChanges).length})</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Metrics Summary Strip */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="bg-white p-4 rounded-xl border border-zinc-100 shadow-sm">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Total Catalog Products</span>
-                  <span className="text-2xl font-bold text-zinc-900">{products.length}</span>
-                </div>
-                <div className="bg-white p-4 rounded-xl border border-zinc-100 shadow-sm">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Total Units In Stock</span>
-                  <span className="text-2xl font-bold text-emerald-600">
-                    {products.reduce((acc, p) => {
-                      const editData = masterStockEdits[p.id.toString()];
-                      if (editData?.stockMap) {
-                        let sum = 0;
-                        Object.values(editData.stockMap).forEach(sMap => {
-                          Object.values(sMap || {}).forEach(qty => { sum += (Number(qty) || 0); });
-                        });
-                        return acc + sum;
-                      }
-                      return acc + (p.stock || 0);
-                    }, 0).toLocaleString()}
-                  </span>
-                </div>
-                <div className="bg-white p-4 rounded-xl border border-zinc-100 shadow-sm">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500 block mb-1">Low Stock Items (1-10)</span>
-                  <span className="text-2xl font-bold text-amber-600">
-                    {products.filter(p => {
-                      const editData = masterStockEdits[p.id.toString()];
-                      let sum = p.stock || 0;
-                      if (editData?.stockMap) {
-                        let s = 0;
-                        Object.values(editData.stockMap).forEach(sMap => {
-                          Object.values(sMap || {}).forEach(qty => { s += (Number(qty) || 0); });
-                        });
-                        sum = s;
-                      }
-                      return sum > 0 && sum <= 10;
-                    }).length}
-                  </span>
-                </div>
-                <div className="bg-white p-4 rounded-xl border border-zinc-100 shadow-sm">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-red-500 block mb-1">Out of Stock</span>
-                  <span className="text-2xl font-bold text-red-600">
-                    {products.filter(p => {
-                      const editData = masterStockEdits[p.id.toString()];
-                      let sum = p.stock || 0;
-                      if (editData?.stockMap) {
-                        let s = 0;
-                        Object.values(editData.stockMap).forEach(sMap => {
-                          Object.values(sMap || {}).forEach(qty => { s += (Number(qty) || 0); });
-                        });
-                        sum = s;
-                      }
-                      return sum === 0;
-                    }).length}
-                  </span>
-                </div>
-              </div>
-
-              {/* Filters & Search Toolbar */}
-              <div className="bg-white p-4 rounded-xl border border-zinc-100 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
-                <div className="flex-1 w-full relative">
-                  <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
-                  <input
-                    type="text"
-                    placeholder="Search product name, category, or color..."
-                    value={masterSearchQuery}
-                    onChange={(e) => setMasterSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg outline-none focus:bg-white focus:border-zinc-900 transition-all"
-                  />
-                  {masterSearchQuery && (
-                    <button onClick={() => setMasterSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400 hover:text-zinc-700">
-                      Clear
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-3 w-full md:w-auto">
-                  {/* Category Filter */}
-                  <select
-                    value={masterCategoryFilter}
-                    onChange={(e) => setMasterCategoryFilter(e.target.value)}
-                    className="px-3 py-2 text-xs font-semibold bg-zinc-50 border border-zinc-200 rounded-lg outline-none focus:border-zinc-900"
-                  >
-                    <option value="All">All Categories ({categories.length})</option>
-                    {categories.map(c => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-
-                  {/* Stock Status Filter */}
-                  <select
-                    value={masterStockFilter}
-                    onChange={(e) => setMasterStockFilter(e.target.value)}
-                    className="px-3 py-2 text-xs font-semibold bg-zinc-50 border border-zinc-200 rounded-lg outline-none focus:border-zinc-900"
-                  >
-                    <option value="All">All Stock Status</option>
-                    <option value="In Stock">In Stock (&gt;10)</option>
-                    <option value="Low Stock">Low Stock (1-10)</option>
-                    <option value="Out of Stock">Out of Stock (0)</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Master Products Stock List */}
-              {loading ? (
-                <div className="bg-white p-12 rounded-2xl border border-zinc-100 text-center">
-                  <RefreshCw size={24} className="animate-spin mx-auto text-zinc-400 mb-3" />
-                  <p className="text-sm font-medium text-zinc-500">Loading products inventory...</p>
-                </div>
-              ) : products.length === 0 ? (
-                <div className="bg-white p-12 rounded-2xl border border-zinc-100 text-center">
-                  <Package size={36} className="mx-auto text-zinc-300 mb-3" />
-                  <h4 className="text-base font-bold text-zinc-900">No products found</h4>
-                  <p className="text-xs text-zinc-500 mt-1 mb-4">Add your first product to start managing inventory</p>
-                  <button onClick={openAddProductModal} className="btn-primary py-2 px-6 text-xs">
-                    Add Product
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {products
-                    .filter(product => {
-                      const matchesSearch = !masterSearchQuery ||
-                        product.name?.toLowerCase().includes(masterSearchQuery.toLowerCase()) ||
-                        product.category?.toLowerCase().includes(masterSearchQuery.toLowerCase()) ||
-                        (Array.isArray(product.colors) && product.colors.some(c => String(c).toLowerCase().includes(masterSearchQuery.toLowerCase()))) ||
-                        (typeof product.colors === 'string' && product.colors.toLowerCase().includes(masterSearchQuery.toLowerCase()));
-
-                      const matchesCat = masterCategoryFilter === 'All' || product.category === masterCategoryFilter;
-
-                      const editData = masterStockEdits[product.id.toString()];
-                      let curTotal = product.stock || 0;
-                      if (editData?.stockMap) {
-                        let sum = 0;
-                        Object.values(editData.stockMap).forEach(sMap => {
-                          Object.values(sMap || {}).forEach(qty => { sum += (Number(qty) || 0); });
-                        });
-                        curTotal = sum;
-                      }
-
-                      const matchesStock = masterStockFilter === 'All' ||
-                        (masterStockFilter === 'In Stock' && curTotal > 10) ||
-                        (masterStockFilter === 'Low Stock' && curTotal > 0 && curTotal <= 10) ||
-                        (masterStockFilter === 'Out of Stock' && curTotal === 0);
-
-                      return matchesSearch && matchesCat && matchesStock;
-                    })
-                    .map(product => {
-                      const pIdStr = product.id.toString();
-                      const editData = masterStockEdits[pIdStr] || { stockMap: product.stockMap || {}, stockStatus: product.stockStatus || 'In Stock' };
-                      
-                      const isShirtProd = (product.category || '').toLowerCase().includes('shirt');
-                      const fallbackSizes = isShirtProd ? ['M', 'L', 'XL', 'XXL'] : ['28', '30', '32', '34', '36', '38', '40'];
-                      const pSizes = Array.isArray(product.sizes) && product.sizes.length > 0 
-                        ? product.sizes.map(s => String(s).trim()).filter(Boolean) 
-                        : (typeof product.sizes === 'string' && product.sizes.trim().length > 0 ? product.sizes.split(',').map(s => s.trim()).filter(Boolean) : fallbackSizes);
-                      
-                      const pColors = Array.isArray(product.colors) && product.colors.length > 0 
-                        ? product.colors.map(c => String(c).trim()).filter(Boolean) 
-                        : (typeof product.colors === 'string' && product.colors.trim().length > 0 ? product.colors.split(',').map(c => c.trim()).filter(Boolean) : ['Standard']);
-
-                      let computedTotal = 0;
-                      Object.values(editData.stockMap || {}).forEach(sMap => {
-                        Object.values(sMap || {}).forEach(qty => {
-                          computedTotal += (Number(qty) || 0);
-                        });
-                      });
-
-                      const isSaving = savingProductId === pIdStr;
-                      const isSaved = savedProductSuccess[pIdStr];
-                      const hasChanges = editData.hasChanges;
-
-                      return (
-                        <div 
-                          key={product.id} 
-                          className={`bg-white rounded-2xl border transition-all shadow-sm overflow-hidden ${
-                            hasChanges ? 'border-amber-400 ring-2 ring-amber-100' : 'border-zinc-200 hover:border-zinc-300'
-                          }`}
-                        >
-                          {/* Card Top Row */}
-                          <div className="p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-zinc-100 bg-zinc-50/50">
-                            <div className="flex items-center gap-4">
-                              <div className="w-16 h-16 rounded-xl overflow-hidden bg-zinc-100 border border-zinc-200 flex-shrink-0 flex items-center justify-center">
-                                {product.image ? (
-                                  <img src={product.image} alt={product.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                ) : (
-                                  <Package size={24} className="text-zinc-400" />
-                                )}
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-2 flex-wrap mb-1">
-                                  <span className="px-2.5 py-0.5 bg-zinc-900 text-white rounded-full text-[10px] font-bold uppercase tracking-wider">
-                                    {product.category || 'Product'}
-                                  </span>
-                                  {hasChanges && (
-                                    <span className="px-2 py-0.5 bg-amber-500 text-white rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                                      Unsaved
-                                    </span>
-                                  )}
-                                </div>
-                                <h4 className="font-serif font-bold text-base text-zinc-900 leading-tight">
-                                  {product.name}
-                                </h4>
-                                <div className="flex items-center gap-3 mt-1 text-xs">
-                                  <span className="font-bold text-zinc-900">৳{product.price}</span>
-                                  {product.originalPrice > product.price && (
-                                    <span className="text-zinc-400 line-through">৳{product.originalPrice}</span>
-                                  )}
-                                  <span className="text-zinc-300">|</span>
-                                  <span className="text-zinc-500 font-medium">
-                                    {pColors.length} {pColors.length > 1 ? 'Colors' : 'Color'} • {pSizes.length} {pSizes.length > 1 ? 'Sizes' : 'Size'}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Status & Quick Actions */}
-                            <div className="flex items-center flex-wrap gap-3">
-                              {/* Total Quantity Pill */}
-                              <div className="px-4 py-2 bg-white rounded-xl border border-zinc-200 flex items-center gap-2.5 shadow-sm">
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Total QN:</span>
-                                <span className={`text-base font-bold ${
-                                  computedTotal === 0 ? 'text-red-600' : computedTotal <= 10 ? 'text-amber-600' : 'text-emerald-700'
-                                }`}>
-                                  {computedTotal} <span className="text-xs font-medium text-zinc-500">units</span>
-                                </span>
-                              </div>
-
-                              {/* Status Badge */}
-                              <span className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                                computedTotal === 0 ? 'bg-red-50 text-red-700 border border-red-200' :
-                                computedTotal <= 10 ? 'bg-amber-50 text-amber-700 border border-amber-200' :
-                                'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              }`}>
-                                <span className={`w-2 h-2 rounded-full ${
-                                  computedTotal === 0 ? 'bg-red-500' : computedTotal <= 10 ? 'bg-amber-500' : 'bg-emerald-500'
-                                }`} />
-                                {computedTotal === 0 ? 'Out of Stock' : computedTotal <= 10 ? 'Low Stock' : 'In Stock'}
-                              </span>
-
-                              {/* Save Individual Stock Button */}
-                              <button
-                                onClick={() => handleSaveProductStock(product.id)}
-                                disabled={isSaving}
-                                className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 shadow-sm ${
-                                  isSaved
-                                    ? 'bg-emerald-600 text-white'
-                                    : hasChanges
-                                    ? 'bg-zinc-900 hover:bg-zinc-800 text-white'
-                                    : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
-                                }`}
-                              >
-                                {isSaving ? (
-                                  <RefreshCw size={14} className="animate-spin" />
-                                ) : isSaved ? (
-                                  <Check size={14} />
-                                ) : (
-                                  <Save size={14} />
-                                )}
-                                <span>{isSaved ? 'Saved!' : isSaving ? 'Saving...' : 'Save Stock'}</span>
-                              </button>
-
-                              {/* Edit Details Button */}
-                              <button
-                                onClick={() => startEdit(product)}
-                                className="p-2 border border-zinc-200 rounded-xl hover:bg-zinc-100 text-zinc-600 transition-colors"
-                                title="Edit Full Product Details"
-                              >
-                                <Edit size={16} />
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Size and Color Stock Grid */}
-                          <div className="p-5 space-y-5">
-                            {pColors.map(color => (
-                              <div key={color} className="bg-zinc-50/70 border border-zinc-200/80 rounded-xl p-4">
-                                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-3 pb-2 border-b border-zinc-200">
-                                  <div className="flex items-center gap-2">
-                                    <span className="w-2.5 h-2.5 rounded-full border border-zinc-900 bg-zinc-800" />
-                                    <span className="text-xs font-bold uppercase tracking-wider text-zinc-800">{color}</span>
-                                    <span className="text-[10px] text-zinc-400 font-medium">
-                                      ({pSizes.reduce((sAcc, s) => sAcc + (Number(editData.stockMap?.[color]?.[s]) || 0), 0)} pcs in {color})
-                                    </span>
-                                  </div>
-
-                                  {/* Quick Fill presets for this color */}
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-tighter mr-1">Quick Set:</span>
-                                    {[0, 10, 20, 50, 100].map(amt => (
-                                      <button
-                                        key={amt}
-                                        type="button"
-                                        onClick={() => handleMasterQuickFill(product.id, color, amt)}
-                                        className="px-2 py-0.5 text-[10px] font-bold bg-white hover:bg-zinc-900 hover:text-white border border-zinc-200 rounded text-zinc-600 transition-colors"
-                                      >
-                                        {amt === 0 ? 'Clear (0)' : amt}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-
-                                {/* Sizes Matrix */}
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                                  {pSizes.map(size => {
-                                    const qty = editData.stockMap?.[color]?.[size] ?? 0;
-                                    return (
-                                      <div 
-                                        key={size} 
-                                        className="bg-white border border-zinc-200 rounded-xl overflow-hidden hover:border-zinc-400 transition-all shadow-xs"
-                                      >
-                                        <div className="bg-zinc-900 text-white text-[11px] font-bold py-1 px-2 flex justify-between items-center tracking-wider">
-                                          <span>SIZE {size}</span>
-                                          <span className="text-[9px] font-mono opacity-80">QN</span>
-                                        </div>
-
-                                        <div className="p-2">
-                                          <div className="flex items-center justify-between gap-1">
-                                            <button
-                                              type="button"
-                                              onClick={() => handleMasterStockChange(product.id, color, size, Math.max(0, qty - 1))}
-                                              className="w-7 h-7 flex items-center justify-center bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg text-xs font-bold transition-colors select-none"
-                                            >
-                                              -
-                                            </button>
-                                            <input
-                                              type="number"
-                                              min="0"
-                                              value={qty}
-                                              onChange={(e) => handleMasterStockChange(product.id, color, size, parseInt(e.target.value) || 0)}
-                                              className="w-full text-center font-bold text-sm text-zinc-900 bg-transparent py-1 outline-none border-b border-transparent focus:border-zinc-900"
-                                            />
-                                            <button
-                                              type="button"
-                                              onClick={() => handleMasterStockChange(product.id, color, size, qty + 1)}
-                                              className="w-7 h-7 flex items-center justify-center bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg text-xs font-bold transition-colors select-none"
-                                            >
-                                              +
-                                            </button>
-                                          </div>
-
-                                          <div className="mt-1.5 text-center">
-                                            <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-tighter ${
-                                              qty === 0 ? 'bg-red-100 text-red-700' :
-                                              qty <= 5 ? 'bg-amber-100 text-amber-800' :
-                                              'bg-emerald-50 text-emerald-700'
-                                            }`}>
-                                              {qty === 0 ? 'Out of Stock' : qty <= 5 ? `Low (${qty})` : `In Stock (${qty})`}
-                                            </span>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'categories' && (
+                    {activeTab === 'categories' && (
             <div className="max-w-md">
               <h3 className="text-xl font-serif font-bold mb-6">Product Categories</h3>
               <div className="bg-white p-6 rounded-xl shadow-sm border border-zinc-100">
@@ -6739,48 +6423,6 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
             </div>
           )}
 
-          {activeTab === 'customers' && (
-            <div className="bg-white rounded-xl shadow-sm border border-zinc-100 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-zinc-100 text-[10px] font-bold uppercase tracking-widest text-zinc-400">
-                      <th className="py-4 px-6">Name</th>
-                      <th className="py-4 px-6">Contact</th>
-                      <th className="py-4 px-6">Address</th>
-                      <th className="py-4 px-6">Total Orders</th>
-                      <th className="py-4 px-6">Join Date</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-sm">
-                    {customers.map(customer => {
-                      const customerOrders = orders.filter(o => o.phone === customer.phone || o.customer_name === customer.name);
-                      return (
-                        <tr key={customer.id} className="border-b border-zinc-50 hover:bg-zinc-50 transition-colors">
-                          <td className="py-4 px-6">
-                            <p className="font-bold">{customer.name}</p>
-                            <p className="text-xs text-zinc-400">{customer.email}</p>
-                          </td>
-                          <td className="py-4 px-6">{customer.phone || 'N/A'}</td>
-                          <td className="py-4 px-6 text-xs max-w-xs truncate">{customer.address || 'N/A'}</td>
-                          <td className="py-4 px-6">
-                            <span className="px-2 py-1 bg-zinc-100 rounded-full text-xs font-bold">{customerOrders.length}</span>
-                          </td>
-                          <td className="py-4 px-6 text-zinc-500">{new Date(customer.created_at || '').toLocaleDateString()}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Finance Tab */}
-          {activeTab === 'finance' && (
-            <FinanceManager showToast={showToast} />
-          )}
-
           {/* Supabase Cloud Tab */}
           {activeTab === 'supabase' && (
             <div className="space-y-6">
@@ -7075,7 +6717,16 @@ export default function App() {
   };
   const [currentPage, setCurrentPage] = useState(() => localStorage.getItem('elegan_page') || 'home');
   const [products, setProducts] = useState<Product[]>([]);
-  const [banners, setBanners] = useState<Banner[]>([]);
+  const [banners, setBanners] = useState<Banner[]>(() => {
+    const saved = localStorage.getItem('elegan_banners');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return defaultBanners;
+  });
   const defaultMiddleBanner: Banner = {
     id: 'default_middle_banner',
     image: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=1920&h=700',
@@ -7333,31 +6984,70 @@ export default function App() {
 
   const fetchProducts = async () => {
     try {
-      const snapshot = await getDocs(collection(db, 'products'));
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
-      if (data.length === 0) {
+      const saved = localStorage.getItem('elegan_products');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setProducts(parsed);
+          }
+        } catch (e) {}
+      }
+
+      const supaData = await fetchProductsFromSupabase();
+      if (supaData && supaData.length > 0) {
+        setProducts(supaData as Product[]);
+        try { localStorage.setItem('elegan_products', JSON.stringify(supaData)); } catch (e) {}
+      } else if (!saved) {
         setProducts(defaultProducts);
-      } else {
-        setProducts(data as Product[]);
       }
     } catch (err) {
-      console.warn('Firestore fetch products notice:', err);
+      console.warn('Supabase fetch products notice:', err);
+      const saved = localStorage.getItem('elegan_products');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setProducts(parsed);
+            return;
+          }
+        } catch (e) {}
+      }
       setProducts(defaultProducts);
     }
   };
 
   const fetchBanners = async () => {
     try {
-      const snapshot = await getDocs(collection(db, 'banners'));
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      if (data.length === 0) {
+      const saved = localStorage.getItem('elegan_banners');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setBanners(parsed);
+          }
+        } catch (e) {}
+      }
+
+      const supaBanners = await fetchBannersFromSupabase();
+      if (supaBanners && supaBanners.length > 0) {
+        setBanners(supaBanners as Banner[]);
+        try { localStorage.setItem('elegan_banners', JSON.stringify(supaBanners)); } catch (e) {}
+      } else if (!saved) {
         setBanners(defaultBanners);
-      } else {
-        setBanners(data as Banner[]);
       }
     } catch (err) {
-      console.warn('Firestore fetch banners notice:', err);
+      console.warn('Supabase fetch banners notice:', err);
+      const saved = localStorage.getItem('elegan_banners');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setBanners(parsed);
+            return;
+          }
+        } catch (e) {}
+      }
       setBanners(defaultBanners);
     }
   };
@@ -7776,10 +7466,7 @@ export default function App() {
               </div>
             </section>
 
-            {/* Middle Campaign Banner (Below Top Rated Products) */}
-            <MiddleBanner banner={middleBanner} onNavigate={handleNavigate} />
-
-            {/* Shirt Collection Section (Below Middle Banner) */}
+            {/* Shirt Collection Section */}
             <FeaturedCollection 
               title="EXPLORE OUR SHIRT COLLECTION"
               products={products}

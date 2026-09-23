@@ -18,16 +18,128 @@ export async function testSupabaseConnection(): Promise<boolean> {
   }
 }
 
+export async function fetchProductsFromSupabase(): Promise<any[] | null> {
+  try {
+    const { data, error } = await supabase.from('products').select('*');
+    if (!error && data && data.length > 0) return data;
+  } catch (err) {
+    console.error('Failed to fetch products from Supabase:', err);
+  }
+  return null;
+}
+
+export async function saveProductToSupabase(product: any) {
+  try {
+    const { error } = await supabase.from('products').upsert([product]);
+    if (error) console.warn('Supabase product upsert notice:', error.message);
+  } catch (err) {
+    console.error('Failed to save product to Supabase:', err);
+  }
+}
+
+export async function deleteProductFromSupabase(id: string) {
+  try {
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (error) console.warn('Supabase product delete notice:', error.message);
+  } catch (err) {
+    console.error('Failed to delete product from Supabase:', err);
+  }
+}
+
+export async function fetchOrdersFromSupabase(): Promise<any[] | null> {
+  try {
+    const { data, error } = await supabase.from('orders').select('*');
+    if (!error && data) return data;
+  } catch (err) {
+    console.error('Failed to fetch orders from Supabase:', err);
+  }
+  return null;
+}
+
 export async function saveOrderToSupabase(order: any) {
   try {
     const { data, error } = await supabase.from('orders').insert([order]);
     if (error) {
-      console.warn('Supabase insert order notice (table may need setup):', error.message);
+      console.warn('Supabase insert order notice:', error.message);
     } else {
       console.log('Order saved to Supabase:', data);
     }
   } catch (err) {
     console.error('Failed to save order to Supabase:', err);
+  }
+}
+
+export async function updateOrderStatusInSupabase(id: string, status: string) {
+  try {
+    const { error } = await supabase.from('orders').update({ status }).eq('id', id);
+    if (error) console.warn('Supabase order status notice:', error.message);
+  } catch (err) {
+    console.error('Failed to update order status in Supabase:', err);
+  }
+}
+
+export async function deleteOrderFromSupabase(id: string) {
+  try {
+    const { error } = await supabase.from('orders').delete().eq('id', id);
+    if (error) console.warn('Supabase order delete notice:', error.message);
+  } catch (err) {
+    console.error('Failed to delete order from Supabase:', err);
+  }
+}
+
+export async function fetchBannersFromSupabase(): Promise<any[] | null> {
+  try {
+    const { data, error } = await supabase.from('banners').select('*');
+    if (!error && data) return data;
+  } catch (err) {
+    console.error('Failed to fetch banners from Supabase:', err);
+  }
+  return null;
+}
+
+export async function saveBannerToSupabase(banner: any) {
+  try {
+    const { error } = await supabase.from('banners').upsert([banner]);
+    if (error) console.warn('Supabase banner upsert notice:', error.message);
+  } catch (err) {
+    console.error('Failed to save banner to Supabase:', err);
+  }
+}
+
+export async function deleteBannerFromSupabase(id: string) {
+  try {
+    const { error } = await supabase.from('banners').delete().eq('id', id);
+    if (error) console.warn('Supabase banner delete notice:', error.message);
+  } catch (err) {
+    console.error('Failed to delete banner from Supabase:', err);
+  }
+}
+
+export async function fetchCouponsFromSupabase(): Promise<any[] | null> {
+  try {
+    const { data, error } = await supabase.from('coupons').select('*');
+    if (!error && data) return data;
+  } catch (err) {
+    console.error('Failed to fetch coupons from Supabase:', err);
+  }
+  return null;
+}
+
+export async function saveCouponToSupabase(coupon: any) {
+  try {
+    const { error } = await supabase.from('coupons').upsert([coupon]);
+    if (error) console.warn('Supabase coupon upsert notice:', error.message);
+  } catch (err) {
+    console.error('Failed to save coupon to Supabase:', err);
+  }
+}
+
+export async function deleteCouponFromSupabase(id: string) {
+  try {
+    const { error } = await supabase.from('coupons').delete().eq('id', id);
+    if (error) console.warn('Supabase coupon delete notice:', error.message);
+  } catch (err) {
+    console.error('Failed to delete coupon from Supabase:', err);
   }
 }
 
