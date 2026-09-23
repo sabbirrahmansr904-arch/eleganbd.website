@@ -2929,6 +2929,181 @@ const CheckoutPage = ({
   );
 };
 
+  const defaultProducts: Product[] = [
+    {
+      id: 'default_cuban_shirt',
+      name: "Classic Cuban Collar Shirt",
+      price: 599,
+      originalPrice: 899,
+      image: "https://images.unsplash.com/photo-1603252109303-2751441dd157?q=80&w=1000&auto=format&fit=crop",
+      category: "Cuban Shirt",
+      rating: 4.8,
+      reviews: 56,
+      fabric: "Viscose Rayon",
+      fit: "Relaxed Fit",
+      description: "Comfortable and stylish Cuban collar shirt for a relaxed look.",
+      sizes: ["M", "L", "XL", "XXL"],
+      colors: ["Black", "White", "Navy"],
+      stock: 50
+    },
+    {
+      id: 'default_navy_pant',
+      name: "Premium Navy Formal Pant",
+      price: 1250,
+      originalPrice: 1850,
+      image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?q=80&w=1000&auto=format&fit=crop",
+      category: "Formal Pant",
+      rating: 4.9,
+      reviews: 124,
+      fabric: "Premium Tropical",
+      fit: "Slim Fit",
+      description: "Our signature formal pant designed for maximum comfort and style.",
+      sizes: ["28", "30", "32", "34", "36", "38", "40"],
+      colors: ["Navy", "Black", "Grey"],
+      stock: 45
+    },
+    {
+      id: 'default_white_shirt',
+      name: "Classic White Formal Shirt",
+      price: 1450,
+      originalPrice: 1950,
+      image: "https://images.unsplash.com/photo-1598033129183-c4f50c7176c8?q=80&w=1000&auto=format&fit=crop",
+      category: "Formal Shirt",
+      rating: 4.8,
+      reviews: 86,
+      fabric: "Egyptian Cotton",
+      fit: "Regular Fit",
+      description: "A timeless classic white shirt for every formal occasion.",
+      sizes: ["M", "L", "XL", "XXL"],
+      colors: ["White"],
+      stock: 40
+    },
+    {
+      id: 'default_sky_shirt',
+      name: "Sky Blue Executive Shirt",
+      price: 1550,
+      originalPrice: 2150,
+      image: "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?q=80&w=1000&auto=format&fit=crop",
+      category: "Formal Shirt",
+      rating: 4.9,
+      reviews: 92,
+      fabric: "Giza Cotton",
+      fit: "Slim Fit",
+      description: "Professional sky blue shirt with a premium finish.",
+      sizes: ["M", "L", "XL", "XXL"],
+      colors: ["Sky Blue"],
+      stock: 35
+    },
+    {
+      id: 'default_grey_pant',
+      name: "Charcoal Grey Formal Pant",
+      price: 1250,
+      originalPrice: 1850,
+      image: "https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?q=80&w=1000&auto=format&fit=crop",
+      category: "Formal Pant",
+      rating: 4.7,
+      reviews: 108,
+      fabric: "Premium Tropical",
+      fit: "Slim Fit",
+      description: "Versatile charcoal grey pant for daily office wear.",
+      sizes: ["28", "30", "32", "34", "36", "38", "40"],
+      colors: ["Grey", "Charcoal"],
+      stock: 50
+    },
+    {
+      id: 'default_black_pant',
+      name: "Jet Black Executive Formal Pant",
+      price: 1250,
+      originalPrice: 1850,
+      image: "https://images.unsplash.com/photo-1479064555552-3ef4979f8908?q=80&w=1000&auto=format&fit=crop",
+      category: "Formal Pant",
+      rating: 4.9,
+      reviews: 136,
+      fabric: "Premium Tropical",
+      fit: "Slim Fit",
+      description: "Classic deep black formal pant with refined tailoring.",
+      sizes: ["28", "30", "32", "34", "36", "38", "40"],
+      colors: ["Black"],
+      stock: 60
+    },
+    {
+      id: 'default_beige_pant',
+      name: "Cream Khaki Formal Pant",
+      price: 1250,
+      originalPrice: 1850,
+      image: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?q=80&w=1000&auto=format&fit=crop",
+      category: "Formal Pant",
+      rating: 4.8,
+      reviews: 94,
+      fabric: "Cotton Blend",
+      fit: "Slim Fit",
+      description: "Sophisticated khaki formal pant for versatile styling.",
+      sizes: ["28", "30", "32", "34", "36", "38", "40"],
+      colors: ["Khaki", "Beige"],
+      stock: 40
+    },
+    {
+      id: 'default_black_shirt',
+      name: "Midnight Black Formal Shirt",
+      price: 1650,
+      originalPrice: 2250,
+      image: "https://images.unsplash.com/photo-1603252109303-2751441dd157?q=80&w=1000&auto=format&fit=crop",
+      category: "Formal Shirt",
+      rating: 4.8,
+      reviews: 74,
+      fabric: "Oxford Cotton",
+      fit: "Slim Fit",
+      description: "Elegant black shirt for evening events and formal meetings.",
+      sizes: ["M", "L", "XL", "XXL"],
+      colors: ["Black"],
+      stock: 30
+    },
+    {
+      id: 'default_pink_shirt',
+      name: "Light Pink Formal Shirt",
+      price: 1450,
+      originalPrice: 1950,
+      image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?q=80&w=1000&auto=format&fit=crop",
+      category: "Formal Shirt",
+      rating: 4.7,
+      reviews: 65,
+      fabric: "Premium Cotton",
+      fit: "Regular Fit",
+      description: "Sophisticated light pink shirt for a modern look.",
+      sizes: ["M", "L", "XL", "XXL"],
+      colors: ["Pink"],
+      stock: 25
+    },
+    {
+      id: 'default_striped_shirt',
+      name: "Striped Executive Shirt",
+      price: 1750,
+      originalPrice: 2450,
+      image: "https://images.unsplash.com/photo-1593030761757-71fae45fa0e7?q=80&w=1000&auto=format&fit=crop",
+      category: "Formal Shirt",
+      rating: 4.9,
+      reviews: 58,
+      fabric: "Italian Cotton",
+      fit: "Slim Fit",
+      description: "Premium striped shirt for the bold professional.",
+      sizes: ["M", "L", "XL", "XXL"],
+      colors: ["Striped Navy"],
+      stock: 20
+    }
+  ];
+
+  const defaultBanners: Banner[] = [
+    {
+      id: 'default_hero_banner',
+      image: 'https://images.unsplash.com/photo-1490515642209-717d61d5b0f0?auto=format&fit=crop&q=80&w=1920&h=700',
+      mobile_image: 'https://images.unsplash.com/photo-1490515642209-717d61d5b0f0?auto=format&fit=crop&q=80&w=800&h=900',
+      title: '',
+      subtitle: '',
+      buttonText: 'SHOP NOW!',
+      link: '/shop'
+    }
+  ];
+
 const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshPromoImage, onRefreshHeroVideo, onRefreshHeroImage, onRefreshCategories, onRefreshMiddleBanner, showToast }: { onBack: () => void, onRefreshProducts: () => void, onRefreshBanners: () => void, onRefreshPromoImage: () => void, onRefreshHeroVideo: () => void, onRefreshHeroImage: () => void, onRefreshCategories?: () => void, onRefreshMiddleBanner?: () => void, showToast: (msg: string, type?: 'success' | 'error' | 'info') => void }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -6807,180 +6982,6 @@ export default function App() {
     }
   };
 
-  const defaultProducts: Product[] = [
-    {
-      id: 'default_cuban_shirt',
-      name: "Classic Cuban Collar Shirt",
-      price: 599,
-      originalPrice: 899,
-      image: "https://images.unsplash.com/photo-1603252109303-2751441dd157?q=80&w=1000&auto=format&fit=crop",
-      category: "Cuban Shirt",
-      rating: 4.8,
-      reviews: 56,
-      fabric: "Viscose Rayon",
-      fit: "Relaxed Fit",
-      description: "Comfortable and stylish Cuban collar shirt for a relaxed look.",
-      sizes: ["M", "L", "XL", "XXL"],
-      colors: ["Black", "White", "Navy"],
-      stock: 50
-    },
-    {
-      id: 'default_navy_pant',
-      name: "Premium Navy Formal Pant",
-      price: 1250,
-      originalPrice: 1850,
-      image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?q=80&w=1000&auto=format&fit=crop",
-      category: "Formal Pant",
-      rating: 4.9,
-      reviews: 124,
-      fabric: "Premium Tropical",
-      fit: "Slim Fit",
-      description: "Our signature formal pant designed for maximum comfort and style.",
-      sizes: ["28", "30", "32", "34", "36", "38", "40"],
-      colors: ["Navy", "Black", "Grey"],
-      stock: 45
-    },
-    {
-      id: 'default_white_shirt',
-      name: "Classic White Formal Shirt",
-      price: 1450,
-      originalPrice: 1950,
-      image: "https://images.unsplash.com/photo-1598033129183-c4f50c7176c8?q=80&w=1000&auto=format&fit=crop",
-      category: "Formal Shirt",
-      rating: 4.8,
-      reviews: 86,
-      fabric: "Egyptian Cotton",
-      fit: "Regular Fit",
-      description: "A timeless classic white shirt for every formal occasion.",
-      sizes: ["M", "L", "XL", "XXL"],
-      colors: ["White"],
-      stock: 40
-    },
-    {
-      id: 'default_sky_shirt',
-      name: "Sky Blue Executive Shirt",
-      price: 1550,
-      originalPrice: 2150,
-      image: "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?q=80&w=1000&auto=format&fit=crop",
-      category: "Formal Shirt",
-      rating: 4.9,
-      reviews: 92,
-      fabric: "Giza Cotton",
-      fit: "Slim Fit",
-      description: "Professional sky blue shirt with a premium finish.",
-      sizes: ["M", "L", "XL", "XXL"],
-      colors: ["Sky Blue"],
-      stock: 35
-    },
-    {
-      id: 'default_grey_pant',
-      name: "Charcoal Grey Formal Pant",
-      price: 1250,
-      originalPrice: 1850,
-      image: "https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?q=80&w=1000&auto=format&fit=crop",
-      category: "Formal Pant",
-      rating: 4.7,
-      reviews: 108,
-      fabric: "Premium Tropical",
-      fit: "Slim Fit",
-      description: "Versatile charcoal grey pant for daily office wear.",
-      sizes: ["28", "30", "32", "34", "36", "38", "40"],
-      colors: ["Grey", "Charcoal"],
-      stock: 50
-    },
-    {
-      id: 'default_black_pant',
-      name: "Jet Black Executive Formal Pant",
-      price: 1250,
-      originalPrice: 1850,
-      image: "https://images.unsplash.com/photo-1479064555552-3ef4979f8908?q=80&w=1000&auto=format&fit=crop",
-      category: "Formal Pant",
-      rating: 4.9,
-      reviews: 136,
-      fabric: "Premium Tropical",
-      fit: "Slim Fit",
-      description: "Classic deep black formal pant with refined tailoring.",
-      sizes: ["28", "30", "32", "34", "36", "38", "40"],
-      colors: ["Black"],
-      stock: 60
-    },
-    {
-      id: 'default_beige_pant',
-      name: "Cream Khaki Formal Pant",
-      price: 1250,
-      originalPrice: 1850,
-      image: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?q=80&w=1000&auto=format&fit=crop",
-      category: "Formal Pant",
-      rating: 4.8,
-      reviews: 94,
-      fabric: "Cotton Blend",
-      fit: "Slim Fit",
-      description: "Sophisticated khaki formal pant for versatile styling.",
-      sizes: ["28", "30", "32", "34", "36", "38", "40"],
-      colors: ["Khaki", "Beige"],
-      stock: 40
-    },
-    {
-      id: 'default_black_shirt',
-      name: "Midnight Black Formal Shirt",
-      price: 1650,
-      originalPrice: 2250,
-      image: "https://images.unsplash.com/photo-1603252109303-2751441dd157?q=80&w=1000&auto=format&fit=crop",
-      category: "Formal Shirt",
-      rating: 4.8,
-      reviews: 74,
-      fabric: "Oxford Cotton",
-      fit: "Slim Fit",
-      description: "Elegant black shirt for evening events and formal meetings.",
-      sizes: ["M", "L", "XL", "XXL"],
-      colors: ["Black"],
-      stock: 30
-    },
-    {
-      id: 'default_pink_shirt',
-      name: "Light Pink Formal Shirt",
-      price: 1450,
-      originalPrice: 1950,
-      image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?q=80&w=1000&auto=format&fit=crop",
-      category: "Formal Shirt",
-      rating: 4.7,
-      reviews: 65,
-      fabric: "Premium Cotton",
-      fit: "Regular Fit",
-      description: "Sophisticated light pink shirt for a modern look.",
-      sizes: ["M", "L", "XL", "XXL"],
-      colors: ["Pink"],
-      stock: 25
-    },
-    {
-      id: 'default_striped_shirt',
-      name: "Striped Executive Shirt",
-      price: 1750,
-      originalPrice: 2450,
-      image: "https://images.unsplash.com/photo-1593030761757-71fae45fa0e7?q=80&w=1000&auto=format&fit=crop",
-      category: "Formal Shirt",
-      rating: 4.9,
-      reviews: 58,
-      fabric: "Italian Cotton",
-      fit: "Slim Fit",
-      description: "Premium striped shirt for the bold professional.",
-      sizes: ["M", "L", "XL", "XXL"],
-      colors: ["Striped Navy"],
-      stock: 20
-    }
-  ];
-
-  const defaultBanners: Banner[] = [
-    {
-      id: 'default_hero_banner',
-      image: 'https://images.unsplash.com/photo-1490515642209-717d61d5b0f0?auto=format&fit=crop&q=80&w=1920&h=700',
-      mobile_image: 'https://images.unsplash.com/photo-1490515642209-717d61d5b0f0?auto=format&fit=crop&q=80&w=800&h=900',
-      title: '',
-      subtitle: '',
-      buttonText: 'SHOP NOW!',
-      link: '/shop'
-    }
-  ];
 
   const fetchProducts = async () => {
     try {
