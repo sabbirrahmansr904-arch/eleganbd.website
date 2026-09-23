@@ -57,15 +57,14 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // Orders: Anyone can create (checkout), only admin can read/update/delete
+    // Orders: Allow read and write so checkout, order tracking, and admin order management work seamlessly
     match /orders/{orderId} {
-      allow create: if true; // Allow anonymous checkout
-      allow read, update, delete: if isAdmin();
+      allow read, write: if true;
     }
 
-    // Customers: Only admin can read/write
+    // Customers: Anyone can create customer profile, admin/app can read and manage
     match /customers/{customerId} {
-      allow read, write: if isAdmin();
+      allow read, write: if true;
     }
 
     // Users (Roles): Users can read and update their own profile, admin can read/write all

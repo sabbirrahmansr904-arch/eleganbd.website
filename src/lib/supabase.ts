@@ -66,8 +66,31 @@ export async function deleteProductFromSupabase(id: string) {
 
 export async function fetchOrdersFromSupabase(): Promise<any[] | null> {
   try {
-    const { data, error } = await supabase.from('orders').select('*');
-    if (!error && data) return data;
+    const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+    if (!error && data) {
+      return data.map(item => ({
+        id: item.order_id || item.id,
+        order_id: item.order_id,
+        customer_name: item.customer_name,
+        customerName: item.customer_name,
+        phone: item.phone,
+        address: item.address,
+        district: item.district,
+        shipping_zone: item.shipping_zone,
+        shipping_cost: item.shipping_cost,
+        items: Array.isArray(item.items) ? JSON.stringify(item.items) : (item.items || '[]'),
+        subtotal: item.subtotal,
+        discount_amount: item.discount,
+        coupon_used: item.voucher_code,
+        total_amount: Number(item.total) || 0,
+        totalAmount: Number(item.total) || 0,
+        status: item.status || 'Pending',
+        payment_method: item.notes?.includes('Payment:') ? item.notes.split('Payment:')[1]?.trim() : (item.payment_method || 'COD'),
+        paymentMethod: item.notes?.includes('Payment:') ? item.notes.split('Payment:')[1]?.trim() : (item.payment_method || 'COD'),
+        created_at: item.created_at,
+        createdAt: item.created_at
+      }));
+    }
   } catch (err) {
     console.error('Failed to fetch orders from Supabase:', err);
   }
@@ -76,11 +99,44 @@ export async function fetchOrdersFromSupabase(): Promise<any[] | null> {
 
 export async function saveOrderToSupabase(order: any) {
   try {
-    const { data, error } = await supabase.from('orders').insert([order]);
+    let parsedItems = [];
+    if (typeof order.items === 'string') {
+      try {
+        parsedItems = JSON.parse(order.items);
+      } catch (e) {
+        parsedItems = [];
+      }
+    } else if (Array.isArray(order.items)) {
+      parsedItems = order.items;
+    }
+
+    const orderId = order.id || order.order_id || ('ord_' + Date.now());
+    const totalAmount = Number(order.total_amount || order.total) || 0;
+    const shippingFee = Number(order.shipping_cost) || (order.location === 'outside' ? 130 : 70);
+    const discountVal = Number(order.discount_amount || order.discount) || 0;
+    const subtotalVal = Number(order.subtotal) || Math.max(0, totalAmount - shippingFee + discountVal);
+
+    const payload = {
+      order_id: orderId,
+      customer_name: order.customer_name || order.customerName || 'Customer',
+      phone: order.phone || '',
+      address: order.address || '',
+      district: order.district || (order.address?.includes('Dhaka') ? 'Dhaka' : 'Other'),
+      shipping_zone: order.shipping_zone || (order.location === 'outside' ? 'Outside Dhaka' : 'Inside Dhaka'),
+      shipping_cost: shippingFee,
+      items: parsedItems,
+      subtotal: subtotalVal,
+      discount: discountVal,
+      voucher_code: order.coupon_used || order.voucher_code || null,
+      total: totalAmount,
+      status: order.status || 'Pending',
+      created_at: order.created_at || order.createdAt || new Date().toISOString(),
+      notes: order.payment_method ? `Payment: ${order.payment_method}` : (order.notes || '')
+    };
+
+    const { error } = await supabase.from('orders').upsert([payload], { onConflict: 'order_id' });
     if (error) {
-      console.warn('Supabase insert order notice:', error.message);
-    } else {
-      console.log('Order saved to Supabase:', data);
+      console.warn('Supabase upsert order notice:', error.message);
     }
   } catch (err) {
     console.error('Failed to save order to Supabase:', err);
@@ -89,8 +145,11 @@ export async function saveOrderToSupabase(order: any) {
 
 export async function updateOrderStatusInSupabase(id: string, status: string) {
   try {
-    const { error } = await supabase.from('orders').update({ status }).eq('id', id);
-    if (error) console.warn('Supabase order status notice:', error.message);
+    const { error } = await supabase.from('orders').update({ status }).eq('order_id', id);
+    if (error) {
+      // Also try id if order_id didn't match
+      await supabase.from('orders').update({ status }).eq('id', id);
+    }
   } catch (err) {
     console.error('Failed to update order status in Supabase:', err);
   }
@@ -98,8 +157,10 @@ export async function updateOrderStatusInSupabase(id: string, status: string) {
 
 export async function deleteOrderFromSupabase(id: string) {
   try {
-    const { error } = await supabase.from('orders').delete().eq('id', id);
-    if (error) console.warn('Supabase order delete notice:', error.message);
+    const { error } = await supabase.from('orders').delete().eq('order_id', id);
+    if (error) {
+      await supabase.from('orders').delete().eq('id', id);
+    }
   } catch (err) {
     console.error('Failed to delete order from Supabase:', err);
   }

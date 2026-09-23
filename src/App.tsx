@@ -188,102 +188,236 @@ const Logo = ({ className = "", light = true }: { className?: string, light?: bo
 const MyOrdersPage = ({ user, onBack, onNavigate }: { user: User | null, onBack: () => void, onNavigate: (page: string) => void }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [phoneSearch, setPhoneSearch] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+
+  const fetchOrdersForUser = async (searchPhoneOverride?: string) => {
+    setLoading(true);
+    try {
+      const targetPhone = (searchPhoneOverride !== undefined ? searchPhoneOverride : (user?.phone || localStorage.getItem('elegan_last_phone') || '')).trim();
+      const userEmail = user?.email?.trim();
+      let deviceOrderIds: string[] = [];
+      try {
+        const stored = localStorage.getItem('elegan_user_order_ids');
+        if (stored) deviceOrderIds = JSON.parse(stored);
+      } catch (e) {}
+
+      let combined: any[] = [];
+      const seenIds = new Set<string>();
+
+      // 1. Fetch from Firestore
+      try {
+        const snap = await getDocs(collection(db, 'orders'));
+        if (snap && !snap.empty) {
+          snap.docs.forEach(docSnap => {
+            const data = docSnap.data();
+            const orderId = docSnap.id;
+            const matchesPhone = targetPhone && data.phone && (data.phone.trim() === targetPhone || data.phone.replace(/\D/g, '').endsWith(targetPhone.replace(/\D/g, '')));
+            const matchesEmail = userEmail && data.email && data.email.trim().toLowerCase() === userEmail.toLowerCase();
+            const matchesDevice = deviceOrderIds.includes(orderId);
+
+            // If user explicitly searched or is logged in or device has it
+            if (targetPhone ? matchesPhone : (matchesPhone || matchesEmail || matchesDevice)) {
+              if (!seenIds.has(orderId)) {
+                combined.push({ id: orderId, ...data });
+                seenIds.add(orderId);
+              }
+            }
+          });
+        }
+      } catch (fErr) {
+        console.warn('Firestore orders load notice:', fErr);
+      }
+
+      // 2. Fetch from Supabase
+      try {
+        const supaList = await fetchOrdersFromSupabase();
+        if (supaList && supaList.length > 0) {
+          supaList.forEach(data => {
+            const orderId = data.id || data.order_id;
+            const matchesPhone = targetPhone && data.phone && (data.phone.trim() === targetPhone || data.phone.replace(/\D/g, '').endsWith(targetPhone.replace(/\D/g, '')));
+            const matchesEmail = userEmail && data.email && data.email.trim().toLowerCase() === userEmail.toLowerCase();
+            const matchesDevice = deviceOrderIds.includes(orderId);
+
+            if (targetPhone ? matchesPhone : (matchesPhone || matchesEmail || matchesDevice)) {
+              if (!seenIds.has(orderId)) {
+                combined.push(data);
+                seenIds.add(orderId);
+              }
+            }
+          });
+        }
+      } catch (sErr) {
+        console.warn('Supabase orders load notice:', sErr);
+      }
+
+      // 3. Fallback to cached orders
+      if (combined.length === 0) {
+        try {
+          const cached = localStorage.getItem('elegan_orders');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed)) {
+              parsed.forEach((data: any) => {
+                const orderId = data.id || data.order_id;
+                const matchesPhone = targetPhone && data.phone && (data.phone.trim() === targetPhone);
+                const matchesDevice = deviceOrderIds.includes(orderId);
+                if (matchesPhone || matchesDevice) {
+                  if (!seenIds.has(orderId)) {
+                    combined.push(data);
+                    seenIds.add(orderId);
+                  }
+                }
+              });
+            }
+          }
+        } catch (cErr) {}
+      }
+
+      // Sort by date descending
+      combined.sort((a: any, b: any) => new Date(b.created_at || b.createdAt || 0).getTime() - new Date(a.created_at || a.createdAt || 0).getTime());
+      setOrders(combined as any);
+    } catch (err) {
+      console.error('Error fetching orders:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-    const fetchOrders = async () => {
-      try {
-        const q = query(collection(db, 'orders'), where('phone', '==', user.phone || ''));
-        const snapshot = await getDocs(q);
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        // Sort by date descending
-        data.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        setOrders(data as any);
-      } catch (err) {
-        console.error('Error fetching orders:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchOrders();
+    fetchOrdersForUser();
   }, [user]);
 
-  if (!user) {
-    return (
-      <div className="pt-32 pb-20 max-w-7xl mx-auto px-4 text-center">
-        <h1 className="text-3xl font-serif font-bold text-zinc-900 mb-4">My Orders</h1>
-        <p className="text-zinc-500 mb-8">Please login to view your orders.</p>
-        <button onClick={() => onNavigate('home')} className="btn-primary py-3 px-8">Back to Home</button>
-      </div>
-    );
-  }
+  const handlePhoneSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!phoneSearch.trim()) return;
+    setIsSearching(true);
+    fetchOrdersForUser(phoneSearch.trim()).finally(() => setIsSearching(false));
+  };
 
   return (
     <div className="pt-32 pb-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-screen">
-      <button onClick={onBack} className="flex items-center text-zinc-500 hover:text-zinc-900 mb-8 transition-colors text-sm font-bold uppercase tracking-widest">
+      <button onClick={onBack} className="flex items-center text-zinc-500 hover:text-zinc-900 mb-8 transition-colors text-sm font-bold uppercase tracking-widest cursor-pointer">
         <ArrowRight className="rotate-180 mr-2" size={16} />
         Back
       </button>
 
-      <h1 className="text-4xl font-serif font-bold text-zinc-900 mb-8">My Orders</h1>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-3xl sm:text-4xl font-serif font-bold text-zinc-900">My Orders</h1>
+          <p className="text-zinc-500 text-sm mt-1">Check your recent purchase history and delivery status</p>
+        </div>
+
+        {/* Quick Phone Search */}
+        <form onSubmit={handlePhoneSearchSubmit} className="flex gap-2 max-w-md w-full">
+          <input 
+            type="tel"
+            placeholder="Search by phone number..."
+            className="flex-1 bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-zinc-900"
+            value={phoneSearch}
+            onChange={e => setPhoneSearch(e.target.value)}
+          />
+          <button 
+            type="submit" 
+            disabled={isSearching}
+            className="btn-primary px-5 py-2.5 text-xs tracking-wider uppercase font-bold"
+          >
+            {isSearching ? <Loader2 size={16} className="animate-spin" /> : 'Find'}
+          </button>
+        </form>
+      </div>
 
       {loading ? (
-        <div className="flex justify-center py-12"><Loader2 className="animate-spin text-zinc-400" size={32} /></div>
+        <div className="flex flex-col items-center justify-center py-20">
+          <Loader2 className="animate-spin text-zinc-400 mb-4" size={36} />
+          <p className="text-zinc-500 text-sm font-medium">Loading your orders...</p>
+        </div>
       ) : orders.length === 0 ? (
-        <div className="text-center py-16 bg-zinc-50 rounded-2xl">
+        <div className="text-center py-16 bg-zinc-50 rounded-2xl border border-zinc-100 max-w-xl mx-auto px-6">
           <Package size={48} className="mx-auto mb-4 text-zinc-300" />
-          <h2 className="text-xl font-bold mb-2">No orders yet</h2>
-          <p className="text-zinc-500 mb-6">Looks like you haven't made your first order.</p>
-          <button onClick={() => onNavigate('shop')} className="btn-primary py-3 px-8 text-xs">Start Shopping</button>
+          <h2 className="text-xl font-bold mb-2">No orders found</h2>
+          <p className="text-zinc-500 mb-6 text-sm">
+            {phoneSearch ? `No orders found for ${phoneSearch}. Check the number and try again.` : "Looks like you haven't placed an order yet or placed it with another phone number."}
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <button onClick={() => onNavigate('shop')} className="btn-primary py-3 px-8 text-xs">Start Shopping</button>
+            <button onClick={() => onNavigate('track-order')} className="border border-zinc-300 bg-white hover:bg-zinc-50 text-zinc-800 font-bold py-3 px-6 rounded-none text-xs uppercase tracking-wider">
+              Track by Order ID
+            </button>
+          </div>
         </div>
       ) : (
         <div className="space-y-6">
-          {orders.map((order: any) => (
-            <div key={order.id} className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-100 pb-4 mb-4">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Order ID: {order.id}</p>
-                  <p className="text-sm font-medium text-zinc-900 mt-1">{new Date(order.created_at || order.createdAt).toLocaleDateString()} {new Date(order.created_at || order.createdAt).toLocaleTimeString()}</p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Total Amount</p>
-                    <p className="text-lg font-bold text-zinc-900">৳{order.total_amount || order.totalAmount}</p>
-                  </div>
-                  <span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full ${
-                    order.status === 'Delivered' ? 'bg-green-100 text-green-700' :
-                    order.status === 'Cancelled' ? 'bg-red-100 text-red-700' :
-                    'bg-blue-100 text-blue-700'
-                  }`}>
-                    {order.status || 'Pending'}
-                  </span>
-                </div>
-              </div>
+          {orders.map((order: any) => {
+            let orderItems: any[] = [];
+            try {
+              orderItems = typeof order.items === 'string' ? JSON.parse(order.items) : (Array.isArray(order.items) ? order.items : []);
+            } catch (e) {
+              orderItems = [];
+            }
 
-              <div className="space-y-4">
-                {JSON.parse(typeof order.items === 'string' ? order.items : JSON.stringify(order.items)).map((item: any, idx: number) => (
-                  <div key={idx} className="flex items-center gap-4">
-                    <div className="w-16 h-16 bg-zinc-100 rounded-lg overflow-hidden flex-shrink-0">
-                      <img src={item.image || null} alt={item.name} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?q=80&w=800&auto=format&fit=crop'; }} />
+            return (
+              <div key={order.id} className="bg-white border border-zinc-200 rounded-2xl p-6 sm:p-8 shadow-sm hover:shadow-md transition-shadow">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-100 pb-4 mb-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Order ID:</p>
+                      <span className="font-mono text-sm font-bold text-zinc-900 bg-zinc-100 px-2 py-0.5 rounded">#{order.id}</span>
                     </div>
-                    <div className="flex-1">
-                      <p className="font-bold text-sm text-zinc-900 line-clamp-1">{item.name}</p>
-                      <p className="text-xs text-zinc-500 mt-1">Size: {item.selectedSize} | Qty: {item.quantity}</p>
-                    </div>
-                    <p className="font-bold text-sm">৳{item.price * item.quantity}</p>
+                    <p className="text-xs font-medium text-zinc-500 mt-1">
+                      {order.created_at || order.createdAt ? new Date(order.created_at || order.createdAt).toLocaleString() : 'Recent'}
+                    </p>
                   </div>
-                ))}
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Total Amount</p>
+                      <p className="text-xl font-bold text-zinc-900">৳{order.total_amount || order.totalAmount || order.total || 0}</p>
+                    </div>
+                    <span className={`px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider rounded-full ${
+                      order.status === 'Delivered' ? 'bg-green-100 text-green-700' :
+                      order.status === 'Cancelled' ? 'bg-red-100 text-red-700' :
+                      order.status === 'Shipped' ? 'bg-indigo-100 text-indigo-700' :
+                      order.status === 'Processing' ? 'bg-purple-100 text-purple-700' :
+                      order.status === 'Confirmed' ? 'bg-blue-100 text-blue-700' :
+                      'bg-amber-100 text-amber-700'
+                    }`}>
+                      {order.status || 'Pending'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {orderItems.map((item: any, idx: number) => (
+                    <div key={idx} className="flex items-center gap-4">
+                      <div className="w-16 h-16 bg-zinc-100 rounded-lg overflow-hidden flex-shrink-0">
+                        <img 
+                          src={item.image || null} 
+                          alt={item.name} 
+                          className="w-full h-full object-cover" 
+                          onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?q=80&w=800&auto=format&fit=crop'; }} 
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm text-zinc-900 line-clamp-1">{item.name}</p>
+                        <p className="text-xs text-zinc-500 mt-1">
+                          {item.selectedColor ? `Color: ${item.selectedColor} | ` : ''}
+                          {item.selectedSize ? `Size: ${item.selectedSize} | ` : ''}
+                          Qty: {item.quantity}
+                        </p>
+                      </div>
+                      <p className="font-bold text-sm">৳{(Number(item.price) || 0) * (Number(item.quantity) || 1)}</p>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="mt-6 pt-4 border-t border-zinc-100 flex flex-wrap justify-between items-center text-xs text-zinc-500 gap-2">
+                  <span>Customer: <strong className="text-zinc-900">{order.customer_name || order.customerName}</strong> ({order.phone})</span>
+                  <span>Payment: <strong className="text-zinc-900">{order.payment_method || order.paymentMethod || 'COD'}</strong></span>
+                  <span>Delivery: <strong className="text-zinc-900">{order.shipping_zone || (order.address?.includes('Dhaka') ? 'Inside Dhaka' : 'Outside Dhaka')}</strong></span>
+                </div>
               </div>
-              
-              <div className="mt-6 pt-4 border-t border-zinc-100 flex justify-between items-center text-xs text-zinc-500">
-                <span>Payment: <strong className="text-zinc-900">{order.payment_method || order.paymentMethod}</strong></span>
-                <span>Delivery Area: <strong className="text-zinc-900">{order.address?.includes('Dhaka') ? 'Inside Dhaka' : 'Outside Dhaka'}</strong></span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -353,16 +487,62 @@ const OrderTrackingPage = ({ onBack, showToast }: { onBack: () => void, showToas
 
   const handleTrack = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!orderId) return;
+    const queryTerm = orderId.trim();
+    if (!queryTerm) return;
 
     setSearching(true);
     try {
-      const docRef = doc(db, 'orders', orderId);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        setTrackingOrder({ id: docSnap.id, ...docSnap.data() });
+      let found: any = null;
+      const cleanId = queryTerm.startsWith('#') ? queryTerm.slice(1) : queryTerm;
+
+      // 1. Direct doc lookup by ID in Firestore
+      try {
+        const docRef = doc(db, 'orders', cleanId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          found = { id: docSnap.id, ...docSnap.data() };
+        }
+      } catch (err) {}
+
+      // 2. Query Firestore by phone or order_id
+      if (!found) {
+        try {
+          const snap = await getDocs(collection(db, 'orders'));
+          if (snap && !snap.empty) {
+            for (const d of snap.docs) {
+              const data = d.data();
+              const dId = d.id;
+              if (
+                dId.toLowerCase() === cleanId.toLowerCase() ||
+                (data.phone && (data.phone.trim() === queryTerm || (queryTerm.length >= 10 && data.phone.replace(/\D/g, '').endsWith(queryTerm.replace(/\D/g, '')))))
+              ) {
+                found = { id: dId, ...data };
+                break;
+              }
+            }
+          }
+        } catch (err) {}
+      }
+
+      // 3. Fallback to Supabase
+      if (!found) {
+        try {
+          const supaList = await fetchOrdersFromSupabase();
+          if (supaList) {
+            const match = supaList.find(o => 
+              (o.id && o.id.toLowerCase() === cleanId.toLowerCase()) ||
+              (o.order_id && o.order_id.toLowerCase() === cleanId.toLowerCase()) ||
+              (o.phone && (o.phone.trim() === queryTerm || (queryTerm.length >= 10 && o.phone.replace(/\D/g, '').endsWith(queryTerm.replace(/\D/g, '')))))
+            );
+            if (match) found = match;
+          }
+        } catch (err) {}
+      }
+
+      if (found) {
+        setTrackingOrder(found);
       } else {
-        showToast('Order not found. Please check your ID.', 'error');
+        showToast('Order not found. Please check your Order ID or Phone number.', 'error');
         setTrackingOrder(null);
       }
     } catch (err) {
@@ -375,19 +555,19 @@ const OrderTrackingPage = ({ onBack, showToast }: { onBack: () => void, showToas
 
   return (
     <div className="pt-32 pb-20 max-w-3xl mx-auto px-4 sm:px-6 min-h-screen">
-      <button onClick={onBack} className="flex items-center text-zinc-500 hover:text-zinc-900 mb-8 transition-colors text-sm font-bold uppercase tracking-widest">
+      <button onClick={onBack} className="flex items-center text-zinc-500 hover:text-zinc-900 mb-8 transition-colors text-sm font-bold uppercase tracking-widest cursor-pointer">
         <ArrowRight className="rotate-180 mr-2" size={16} />
         Back
       </button>
 
       <h1 className="text-4xl font-serif font-bold text-zinc-900 mb-4 text-center">Track Your Order</h1>
-      <p className="text-zinc-500 text-center mb-12">Enter your Order ID to see the current status of your package.</p>
+      <p className="text-zinc-500 text-center mb-12">Enter your Order ID or registered Phone Number to see current status.</p>
 
       <form onSubmit={handleTrack} className="mb-12">
         <div className="flex flex-col sm:flex-row gap-4">
           <input 
             type="text" 
-            placeholder="Enter Order ID (e.g. 5xJv...)" 
+            placeholder="Enter Order ID (e.g. 3Y4HYb...) or Phone Number (01XXXXXXXXX)" 
             className="flex-1 bg-zinc-50 border border-zinc-200 rounded-xl px-6 py-4 focus:outline-none focus:border-zinc-900 transition-colors"
             value={orderId}
             onChange={e => setOrderId(e.target.value)}
@@ -396,7 +576,7 @@ const OrderTrackingPage = ({ onBack, showToast }: { onBack: () => void, showToas
           <button 
             type="submit" 
             disabled={searching}
-            className="btn-primary py-4 px-10 flex items-center justify-center gap-2"
+            className="btn-primary py-4 px-10 flex items-center justify-center gap-2 cursor-pointer"
           >
             {searching ? <Loader2 className="animate-spin" size={18} /> : 'Track Order'}
           </button>
@@ -2655,17 +2835,40 @@ const CheckoutPage = ({
         customer_name: formData.name,
         phone: formData.phone,
         address: formData.address,
+        district: formData.city || (formData.location === 'inside' ? 'Dhaka' : 'Outside Dhaka'),
+        shipping_zone: formData.location === 'inside' ? 'Inside Dhaka' : 'Outside Dhaka',
+        shipping_cost: shipping,
+        subtotal: subtotal,
         total_amount: total,
+        total: total,
+        discount_amount: discount,
+        discount: discount,
         items: JSON.stringify(items),
         payment_method: formData.paymentMethod,
-        transaction_id: formData.transactionId,
+        transaction_id: formData.transactionId || null,
         status: 'Pending',
         coupon_used: appliedCoupon?.code || null,
-        discount_amount: discount,
         created_at: new Date().toISOString()
       };
       const docRef = await addDoc(collection(db, 'orders'), orderData);
-      saveOrderToSupabase({ ...orderData, order_id: docRef.id });
+      
+      // Save order to Supabase
+      await saveOrderToSupabase({ ...orderData, order_id: docRef.id, id: docRef.id });
+
+      // Save order ID to localStorage for instant customer lookup
+      try {
+        const storedOrderIds = JSON.parse(localStorage.getItem('elegan_user_order_ids') || '[]');
+        if (!storedOrderIds.includes(docRef.id)) {
+          storedOrderIds.unshift(docRef.id);
+          localStorage.setItem('elegan_user_order_ids', JSON.stringify(storedOrderIds));
+        }
+        localStorage.setItem('elegan_last_phone', formData.phone);
+
+        const cachedOrders = JSON.parse(localStorage.getItem('elegan_orders') || '[]');
+        cachedOrders.unshift({ id: docRef.id, ...orderData });
+        localStorage.setItem('elegan_orders', JSON.stringify(cachedOrders));
+      } catch (e) {}
+
       onComplete(docRef.id);
     } catch (error) {
       console.error("Checkout error:", error);
@@ -3204,20 +3407,54 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
     if (isAuthenticated) {
       setLoading(true);
       if (activeTab === 'orders') {
-        fetchOrdersFromSupabase().then(res => {
-          if (res) {
-            setOrders(res);
-            try { localStorage.setItem('elegan_orders', JSON.stringify(res)); } catch (e) {}
-          } else {
-            const saved = localStorage.getItem('elegan_orders');
-            if (saved) { try { setOrders(JSON.parse(saved)); } catch (e) {} }
+        const loadAdminOrders = async () => {
+          let list: any[] = [];
+          const seen = new Set<string>();
+
+          // 1. Load from Firestore
+          try {
+            const snap = await getDocs(collection(db, 'orders'));
+            if (snap && !snap.empty) {
+              snap.docs.forEach(docSnap => {
+                const id = docSnap.id;
+                list.push({ id, ...docSnap.data() });
+                seen.add(id);
+              });
+            }
+          } catch (fErr) {
+            console.warn('Firestore admin orders error:', fErr);
           }
+
+          // 2. Load from Supabase
+          try {
+            const supaOrders = await fetchOrdersFromSupabase();
+            if (supaOrders && supaOrders.length > 0) {
+              supaOrders.forEach(so => {
+                const sId = so.id || so.order_id;
+                if (!seen.has(sId)) {
+                  list.push(so);
+                  seen.add(sId);
+                }
+              });
+            }
+          } catch (sErr) {
+            console.warn('Supabase admin orders error:', sErr);
+          }
+
+          // 3. Fallback to localStorage
+          if (list.length === 0) {
+            const saved = localStorage.getItem('elegan_orders');
+            if (saved) {
+              try { list = JSON.parse(saved); } catch (e) {}
+            }
+          }
+
+          list.sort((a, b) => new Date(b.created_at || b.createdAt || 0).getTime() - new Date(a.created_at || a.createdAt || 0).getTime());
+          setOrders(list);
+          try { localStorage.setItem('elegan_orders', JSON.stringify(list)); } catch (e) {}
           setLoading(false);
-        }).catch(() => {
-          const saved = localStorage.getItem('elegan_orders');
-          if (saved) { try { setOrders(JSON.parse(saved)); } catch (e) {} }
-          setLoading(false);
-        });
+        };
+        loadAdminOrders();
       } else if (activeTab === 'products') {
         fetchProductsFromSupabase().then(res => {
           const prods = (res && res.length > 0) ? res : (() => {
@@ -3408,9 +3645,14 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
   const updateStatus = async (orderId: number | string, status: string) => {
     try {
       await updateDoc(doc(db, 'orders', orderId.toString()), { status });
-      setOrders(orders.map(o => o.id === orderId ? { ...o, status } : o));
+      await updateOrderStatusInSupabase(orderId.toString(), status);
+      const updated = orders.map(o => o.id === orderId ? { ...o, status } : o);
+      setOrders(updated);
+      try { localStorage.setItem('elegan_orders', JSON.stringify(updated)); } catch (e) {}
+      showToast(`Order status updated to ${status}`, 'success');
     } catch (error) {
       console.error('Error updating status:', error);
+      showToast('Error updating order status', 'error');
     }
   };
 
@@ -3421,7 +3663,10 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
       onConfirm: async () => {
         try {
           await deleteDoc(doc(db, 'orders', orderId.toString()));
-          setOrders(prev => prev.filter(o => o.id !== orderId));
+          await deleteOrderFromSupabase(orderId.toString());
+          const updated = orders.filter(o => o.id !== orderId);
+          setOrders(updated);
+          try { localStorage.setItem('elegan_orders', JSON.stringify(updated)); } catch (e) {}
           showToast('Order Deleted Successfully', 'success');
         } catch (error) {
           console.error('Error deleting order:', error);
@@ -7633,15 +7878,30 @@ export default function App() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.6 }}
+                className="space-y-3"
               >
                 <motion.button 
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => handleNavigate('home')} 
-                  className="bg-zinc-900 hover:bg-zinc-800 text-white w-full py-4 text-sm tracking-widest uppercase font-bold rounded-none transition-colors"
+                  onClick={() => handleNavigate('my-orders')} 
+                  className="bg-zinc-900 hover:bg-zinc-800 text-white w-full py-4 text-xs tracking-widest uppercase font-bold transition-colors cursor-pointer"
                 >
-                  Continue Shopping
+                  View My Orders
                 </motion.button>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => handleNavigate('track-order')} 
+                    className="border border-zinc-200 hover:border-zinc-900 hover:bg-zinc-50 text-zinc-800 w-1/2 py-3 text-xs tracking-wider uppercase font-bold transition-all cursor-pointer"
+                  >
+                    Track Order
+                  </button>
+                  <button 
+                    onClick={() => handleNavigate('shop')} 
+                    className="border border-zinc-200 hover:border-zinc-900 hover:bg-zinc-50 text-zinc-800 w-1/2 py-3 text-xs tracking-wider uppercase font-bold transition-all cursor-pointer"
+                  >
+                    Continue Shopping
+                  </button>
+                </div>
               </motion.div>
             </motion.div>
           </section>
