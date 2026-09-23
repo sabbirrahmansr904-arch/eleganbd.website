@@ -1,0 +1,558 @@
+[
+  {
+    "id": "1Ek7JsTySRxXzeM6VKL0",
+    "reviews": 0,
+    "price": 699,
+    "rating": 5,
+    "description": "",
+    "stockMap": {
+      "Black": {
+        "28": 20,
+        "30": 20,
+        "32": 20,
+        "34": 20,
+        "36": 20,
+        "38": 20,
+        "40": 20
+      },
+      "Navy": {
+        "28": 20,
+        "30": 20,
+        "32": 20,
+        "34": 20,
+        "36": 20,
+        "38": 20,
+        "40": 20
+      },
+      "Grey": {
+        "28": 20,
+        "30": 20,
+        "32": 20,
+        "34": 20,
+        "36": 20,
+        "38": 20,
+        "40": 20
+      },
+      "Sky Blue": {
+        "XL": 10,
+        "XXL": 10,
+        "M": 10,
+        "L": 10
+      }
+    },
+    "fabric": "Refine Cotton Fabrics ",
+    "category": "Formal Shirt",
+    "colors": [
+      "Sky Blue"
+    ],
+    "originalPrice": 1049,
+    "name": "Man's Forma Shirt Sky Blue",
+    "stockStatus": "In Stock",
+    "stock": 460,
+    "images": [
+      "/products/1Ek7JsTySRxXzeM6VKL0.jpg"
+    ],
+    "image": "/products/1Ek7JsTySRxXzeM6VKL0.jpg",
+    "sizes": [
+      "M",
+      "L",
+      "XL",
+      "XXL"
+    ],
+    "fit": "Slim Fit"
+  },
+  {
+    "id": "Afzu2xrkj0Nt4wxbnlh2",
+    "stockStatus": "In Stock",
+    "name": "Man's Formal Shirt Black",
+    "rating": 5,
+    "price": 699,
+    "category": "Formal Shirt",
+    "reviews": 0,
+    "originalPrice": 1049,
+    "image": "/products/Afzu2xrkj0Nt4wxbnlh2.jpg",
+    "sizes": [
+      "M",
+      "L",
+      "XL",
+      "XXL"
+    ],
+    "fit": "Slim Fit",
+    "stockMap": {
+      "Grey": {
+        "28": 20,
+        "30": 20,
+        "32": 20,
+        "34": 20,
+        "36": 20,
+        "38": 20,
+        "40": 20
+      },
+      "Black": {
+        "28": 20,
+        "30": 20,
+        "32": 20,
+        "34": 20,
+        "36": 20,
+        "38": 20,
+        "40": 20,
+        "XL": 1,
+        "L": 1,
+        "M": 1,
+        "XXL": 1
+      },
+      "Navy": {
+        "28": 20,
+        "30": 20,
+        "32": 20,
+        "34": 20,
+        "36": 20,
+        "38": 20,
+        "40": 20
+      }
+    },
+    "images": [
+      "/products/Afzu2xrkj0Nt4wxbnlh2.jpg"
+    ],
+    "stock": 424,
+    "description": "",
+    "colors": [
+      "Black"
+    ],
+    "fabric": "Refine Cotton Fabrics"
+  },
+  {
+    "id": "TO82N1pQZMnhSRAS8MjQ",
+    "name": "Man's Formal Shirt White",
+    "fit": "Slim Fit",
+    "price": 699,
+    "rating": 5,
+    "reviews": 0,
+    "description": "",
+    "stockMap": {
+      "Grey": {
+        "28": 20,
+        "30": 20,
+        "32": 20,
+        "34": 20,
+        "36": 20,
+        "38": 20,
+        "40": 20
+      },
+      "White": {
+        "XL": 1,
+        "XXL": 1,
+        "M": 1,
+        "L": 1
+      },
+      "Navy": {
+        "28": 20,
+        "30": 20,
+        "32": 20,
+        "34": 20,
+        "36": 20,
+        "38": 20,
+        "40": 20
+      },
+      "Black": {
+        "28": 20,
+        "30": 20,
+        "32": 20,
+        "34": 20,
+        "36": 20,
+        "38": 20,
+        "40": 20
+      }
+    },
+    "category": "Formal Shirt",
+    "originalPrice": 1047,
+    "fabric": "Refine Cotton Fabrics ",
+    "stock": 424,
+    "colors": [
+      "White"
+    ],
+    "stockStatus": "In Stock",
+    "images": [
+      "/products/TO82N1pQZMnhSRAS8MjQ.jpg"
+    ],
+    "image": "/products/TO82N1pQZMnhSRAS8MjQ.jpg",
+    "sizes": [
+      "M",
+      "L",
+      "XL",
+      "XXL"
+    ]
+  },
+  {
+    "id": "VVo4AjCoagCMx9mYw7pQ",
+    "category": "Formal Pant",
+    "stock": 46,
+    "stockStatus": "In Stock",
+    "fabric": "Woven Cotton",
+    "image": "/products/VVo4AjCoagCMx9mYw7pQ.jpg",
+    "sizes": [
+      "30",
+      "32",
+      "34",
+      "36",
+      "38"
+    ],
+    "images": [
+      "/products/VVo4AjCoagCMx9mYw7pQ.jpg"
+    ],
+    "fit": "Straight Fit",
+    "colors": [
+      "Black",
+      "Navy",
+      "Grey"
+    ],
+    "name": "Man's Formal Pant Black",
+    "price": 1049,
+    "description": "",
+    "originalPrice": 1399,
+    "reviews": 0,
+    "rating": 5,
+    "stockMap": {
+      "Navy": {
+        "28": 0,
+        "30": 0,
+        "32": 0,
+        "34": 0,
+        "36": 0,
+        "38": 0,
+        "40": 0
+      },
+      "Black": {
+        "28": 0,
+        "30": 10,
+        "32": 10,
+        "34": 10,
+        "36": 10,
+        "38": 6,
+        "40": 0
+      },
+      "Grey": {
+        "28": 0,
+        "30": 0,
+        "32": 0,
+        "34": 0,
+        "36": 0,
+        "38": 0,
+        "40": 0
+      }
+    }
+  },
+  {
+    "id": "bFYqY1ujv9ZZJ503ICJy",
+    "description": "",
+    "images": [
+      "/products/bFYqY1ujv9ZZJ503ICJy.jpg"
+    ],
+    "colors": [
+      "Nevy Blue"
+    ],
+    "fabric": "Woven Cotton",
+    "price": 1049,
+    "originalPrice": 1399,
+    "category": "Formal Pant",
+    "reviews": 0,
+    "fit": "Slim Fit",
+    "rating": 5,
+    "sizes": [
+      "28",
+      "30",
+      "32",
+      "34",
+      "36",
+      "38",
+      "40"
+    ],
+    "image": "/products/bFYqY1ujv9ZZJ503ICJy.jpg",
+    "stockMap": {
+      "Grey": {
+        "28": 20,
+        "30": 20,
+        "32": 20,
+        "34": 20,
+        "36": 20,
+        "38": 20,
+        "40": 20
+      },
+      "Black": {
+        "28": 20,
+        "30": 20,
+        "32": 20,
+        "34": 20,
+        "36": 20,
+        "38": 20,
+        "40": 20
+      },
+      "Navy": {
+        "28": 20,
+        "30": 20,
+        "32": 20,
+        "34": 20,
+        "36": 20,
+        "38": 20,
+        "40": 20
+      }
+    },
+    "stock": 420,
+    "stockStatus": "In Stock",
+    "name": "Man's Formal Pant Nevy Blue"
+  },
+  {
+    "id": "bu5HxEZJXGqdQAOZ3zab",
+    "price": 1049,
+    "fabric": "Woven Cotton",
+    "images": [
+      "/products/bu5HxEZJXGqdQAOZ3zab.jpg"
+    ],
+    "description": "",
+    "colors": [
+      "White"
+    ],
+    "stockMap": {
+      "Navy": {
+        "28": 0,
+        "30": 0,
+        "32": 0,
+        "34": 0,
+        "36": 0,
+        "38": 0,
+        "40": 0
+      },
+      "Black": {
+        "28": 10,
+        "30": 10,
+        "32": 10,
+        "34": 10,
+        "36": 10,
+        "38": 10,
+        "40": 10
+      },
+      "Grey": {
+        "28": 0,
+        "30": 0,
+        "32": 0,
+        "34": 0,
+        "36": 0,
+        "38": 0,
+        "40": 0
+      }
+    },
+    "fit": "Slim Fit",
+    "category": "Formal Pant",
+    "stock": 70,
+    "rating": 5,
+    "originalPrice": 1399,
+    "reviews": 0,
+    "image": "/products/bu5HxEZJXGqdQAOZ3zab.jpg",
+    "sizes": [
+      "28",
+      "30",
+      "32",
+      "34",
+      "36",
+      "38",
+      "40"
+    ],
+    "stockStatus": "In Stock",
+    "name": "Man's Formal Pant White"
+  },
+  {
+    "id": "dEN7shFJ7JHHLUb4Mdzd",
+    "description": "",
+    "stock": 420,
+    "rating": 5,
+    "image": "/products/dEN7shFJ7JHHLUb4Mdzd.jpg",
+    "sizes": [
+      "28",
+      "30",
+      "32",
+      "34",
+      "36",
+      "38",
+      "40"
+    ],
+    "stockMap": {
+      "Grey": {
+        "28": 20,
+        "30": 20,
+        "32": 20,
+        "34": 20,
+        "36": 20,
+        "38": 20,
+        "40": 20
+      },
+      "Black": {
+        "28": 20,
+        "30": 20,
+        "32": 20,
+        "34": 20,
+        "36": 20,
+        "38": 20,
+        "40": 20
+      },
+      "Navy": {
+        "28": 20,
+        "30": 20,
+        "32": 20,
+        "34": 20,
+        "36": 20,
+        "38": 20,
+        "40": 20
+      }
+    },
+    "name": "Man's Formal Pant Cream",
+    "reviews": 0,
+    "fabric": "Woven Cotton",
+    "price": 1049,
+    "category": "Formal Pant",
+    "images": [
+      "/products/dEN7shFJ7JHHLUb4Mdzd.jpg"
+    ],
+    "colors": [
+      "CREAM"
+    ],
+    "fit": "Slim Fit",
+    "originalPrice": 1399,
+    "stockStatus": "In Stock"
+  },
+  {
+    "id": "fyP0FqA5KceIKGfE5kHu",
+    "name": "Man's Formal Pant Light Ash",
+    "description": "",
+    "reviews": 0,
+    "category": "Formal Pant",
+    "colors": [
+      "Light ASH"
+    ],
+    "images": [
+      "/products/fyP0FqA5KceIKGfE5kHu.jpg"
+    ],
+    "fabric": "Woven Cotton",
+    "price": 1049,
+    "fit": "Straight Fit",
+    "originalPrice": 1399,
+    "sizes": [
+      "28",
+      "30",
+      "32",
+      "34",
+      "36",
+      "38",
+      "40"
+    ],
+    "image": "/products/fyP0FqA5KceIKGfE5kHu.jpg",
+    "stockMap": {
+      "Grey": {
+        "28": 20,
+        "30": 20,
+        "32": 20,
+        "34": 20,
+        "36": 20,
+        "38": 20,
+        "40": 20
+      },
+      "Navy": {
+        "28": 20,
+        "30": 20,
+        "32": 20,
+        "34": 20,
+        "36": 20,
+        "38": 20,
+        "40": 20
+      },
+      "Black": {
+        "28": 20,
+        "30": 20,
+        "32": 20,
+        "34": 20,
+        "36": 20,
+        "38": 20,
+        "40": 20
+      },
+      "Light ASH": {
+        "28": 10,
+        "30": 10,
+        "32": 10,
+        "34": 10,
+        "36": 10,
+        "38": 10,
+        "40": 10
+      }
+    },
+    "rating": 5,
+    "stock": 490,
+    "stockStatus": "In Stock"
+  },
+  {
+    "id": "jj1ZJr1HMkIKUMDmqlBX",
+    "stockMap": {
+      "Grey": {
+        "28": 20,
+        "30": 20,
+        "32": 20,
+        "34": 20,
+        "36": 20,
+        "38": 20,
+        "40": 20
+      },
+      "LIGHT ASH": {
+        "M": 1,
+        "XXL": 1,
+        "XL": 1,
+        "L": 1
+      },
+      "Navy": {
+        "28": 20,
+        "30": 20,
+        "32": 20,
+        "34": 20,
+        "36": 20,
+        "38": 20,
+        "40": 20
+      },
+      "SKY BLUE": {
+        "XL": 1,
+        "XXL": 1,
+        "L": 1,
+        "M": 1
+      },
+      "Black": {
+        "28": 20,
+        "30": 20,
+        "32": 20,
+        "34": 20,
+        "36": 20,
+        "38": 20,
+        "40": 20
+      }
+    },
+    "price": 699,
+    "reviews": 0,
+    "fabric": "Refine Cotton Fabrics",
+    "stockStatus": "In Stock",
+    "name": "Man's Formal Shirt Light Ash",
+    "images": [
+      "/products/jj1ZJr1HMkIKUMDmqlBX.jpg"
+    ],
+    "colors": [
+      "LIGHT ASH"
+    ],
+    "fit": "Slim Fit",
+    "stock": 428,
+    "originalPrice": 1048,
+    "description": "",
+    "image": "/products/jj1ZJr1HMkIKUMDmqlBX.jpg",
+    "sizes": [
+      "M",
+      "L",
+      "XL",
+      "XXL"
+    ],
+    "rating": 5,
+    "category": "Formal Shirt"
+  }
+]

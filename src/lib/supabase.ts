@@ -21,7 +21,16 @@ export async function testSupabaseConnection(): Promise<boolean> {
 export async function fetchProductsFromSupabase(): Promise<any[] | null> {
   try {
     const { data, error } = await supabase.from('products').select('*');
-    if (!error && data && data.length > 0) return data;
+    if (!error && data && data.length > 0) {
+      return data.map(item => ({
+        ...item,
+        price: Number(item.price) || 0,
+        originalPrice: Number(item.original_price) || undefined,
+        image: item.image_url || item.image || '',
+        images: item.image_url ? [item.image_url] : (item.images || []),
+        stockStatus: item.stock_status || 'In Stock'
+      }));
+    }
   } catch (err) {
     console.error('Failed to fetch products from Supabase:', err);
   }
@@ -30,7 +39,16 @@ export async function fetchProductsFromSupabase(): Promise<any[] | null> {
 
 export async function saveProductToSupabase(product: any) {
   try {
-    const { error } = await supabase.from('products').upsert([product]);
+    const payload: any = {
+      id: product.id?.toString(),
+      name: product.name,
+      category: product.category || 'General',
+      price: Number(product.price) || 0,
+      original_price: Number(product.originalPrice || product.original_price) || null,
+      stock_status: product.stockStatus || product.stock_status || 'In Stock',
+      image_url: product.image || product.image_url || (Array.isArray(product.images) ? product.images[0] : null)
+    };
+    const { error } = await supabase.from('products').upsert([payload]);
     if (error) console.warn('Supabase product upsert notice:', error.message);
   } catch (err) {
     console.error('Failed to save product to Supabase:', err);
@@ -145,7 +163,16 @@ export async function deleteCouponFromSupabase(id: string) {
 
 export async function syncProductsToSupabase(products: any[]) {
   try {
-    const { error } = await supabase.from('products').upsert(products);
+    const payloads = products.map(p => ({
+      id: p.id?.toString(),
+      name: p.name,
+      category: p.category || 'General',
+      price: Number(p.price) || 0,
+      original_price: Number(p.originalPrice || p.original_price) || null,
+      stock_status: p.stockStatus || p.stock_status || 'In Stock',
+      image_url: p.image || p.image_url || (Array.isArray(p.images) ? p.images[0] : null)
+    }));
+    const { error } = await supabase.from('products').upsert(payloads);
     if (error) {
       console.warn('Supabase products upsert notice:', error.message);
     }

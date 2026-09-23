@@ -86,30 +86,19 @@ import {
 } from './lib/supabase';
 import { GoogleGenAI } from "@google/genai";
 import { Product, CartItem, User, Order, Banner, Coupon, Review } from './types';
+import initialProductsData from './defaultProducts.json';
 import { db, auth, storage } from './firebase';
-import { collection, getDocs as _getDocs, getDoc as _getDoc, doc, addDoc as _addDoc, updateDoc as _updateDoc, deleteDoc as _deleteDoc, setDoc as _setDoc, query, where, orderBy, onSnapshot, disableNetwork } from 'firebase/firestore';
+import { collection, getDocs as _getDocs, getDoc as _getDoc, doc, addDoc as _addDoc, updateDoc as _updateDoc, deleteDoc as _deleteDoc, setDoc as _setDoc, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
-// Force Supabase & LocalStorage mode exclusively to bypass Firestore quota limits completely
-let firestoreQuotaExceeded = true;
+let firestoreQuotaExceeded = false;
 if (typeof window !== 'undefined') {
-  localStorage.setItem('elegan_firestore_quota_exceeded', 'true');
-  try { disableNetwork(db).catch(() => {}); } catch (e) {}
+  localStorage.removeItem('elegan_firestore_quota_exceeded');
 }
 
 const handleFirestoreError = (err: any, actionName: string) => {
-  console.warn(`Firestore ${actionName} warning:`, err);
-  if (err?.message?.includes('resource-exhausted') || err?.code === 'resource-exhausted' || err?.message?.includes('Quota') || err?.code === 'unavailable' || err?.message?.includes('unavailable')) {
-    firestoreQuotaExceeded = true;
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('elegan_firestore_quota_exceeded', 'true');
-        disableNetwork(db).catch(() => {});
-      } catch (e) {}
-    }
-    console.warn(`Firestore ${actionName} offline/quota issue. Switching to local-only mode.`);
-  }
+  console.warn(`Firestore ${actionName} notice:`, err?.message || err);
 };
 
 const setDoc = async (docRef: any, data: any, options?: any) => {
@@ -1250,10 +1239,16 @@ const BannerCarousel = ({ banners }: { banners: Banner[] }) => {
               />
             )}
             <img
-              src={banners[currentIndex].image || banners[currentIndex].mobile_image || ''}
+              src={banners[currentIndex].image || banners[currentIndex].mobile_image || '/banners/hero_desktop.jpg'}
               alt={banners[currentIndex].title || 'Hero Banner'}
               className="w-full aspect-[800/900] md:aspect-[1920/700] object-cover block"
               referrerPolicy="no-referrer"
+              onError={(e) => {
+                const target = e.currentTarget as HTMLImageElement;
+                if (!target.src.includes('/banners/hero_desktop.jpg')) {
+                  target.src = '/banners/hero_desktop.jpg';
+                }
+              }}
             />
           </picture>
           {(banners[currentIndex].title || banners[currentIndex].subtitle) && (
@@ -2929,174 +2924,13 @@ const CheckoutPage = ({
   );
 };
 
-  const defaultProducts: Product[] = [
-    {
-      id: 'default_cuban_shirt',
-      name: "Classic Cuban Collar Shirt",
-      price: 599,
-      originalPrice: 899,
-      image: "https://images.unsplash.com/photo-1603252109303-2751441dd157?q=80&w=1000&auto=format&fit=crop",
-      category: "Cuban Shirt",
-      rating: 4.8,
-      reviews: 56,
-      fabric: "Viscose Rayon",
-      fit: "Relaxed Fit",
-      description: "Comfortable and stylish Cuban collar shirt for a relaxed look.",
-      sizes: ["M", "L", "XL", "XXL"],
-      colors: ["Black", "White", "Navy"],
-      stock: 50
-    },
-    {
-      id: 'default_navy_pant',
-      name: "Premium Navy Formal Pant",
-      price: 1250,
-      originalPrice: 1850,
-      image: "https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?q=80&w=1000&auto=format&fit=crop",
-      category: "Formal Pant",
-      rating: 4.9,
-      reviews: 124,
-      fabric: "Premium Tropical",
-      fit: "Slim Fit",
-      description: "Our signature formal pant designed for maximum comfort and style.",
-      sizes: ["28", "30", "32", "34", "36", "38", "40"],
-      colors: ["Navy", "Black", "Grey"],
-      stock: 45
-    },
-    {
-      id: 'default_white_shirt',
-      name: "Classic White Formal Shirt",
-      price: 1450,
-      originalPrice: 1950,
-      image: "https://images.unsplash.com/photo-1598033129183-c4f50c7176c8?q=80&w=1000&auto=format&fit=crop",
-      category: "Formal Shirt",
-      rating: 4.8,
-      reviews: 86,
-      fabric: "Egyptian Cotton",
-      fit: "Regular Fit",
-      description: "A timeless classic white shirt for every formal occasion.",
-      sizes: ["M", "L", "XL", "XXL"],
-      colors: ["White"],
-      stock: 40
-    },
-    {
-      id: 'default_sky_shirt',
-      name: "Sky Blue Executive Shirt",
-      price: 1550,
-      originalPrice: 2150,
-      image: "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?q=80&w=1000&auto=format&fit=crop",
-      category: "Formal Shirt",
-      rating: 4.9,
-      reviews: 92,
-      fabric: "Giza Cotton",
-      fit: "Slim Fit",
-      description: "Professional sky blue shirt with a premium finish.",
-      sizes: ["M", "L", "XL", "XXL"],
-      colors: ["Sky Blue"],
-      stock: 35
-    },
-    {
-      id: 'default_grey_pant',
-      name: "Charcoal Grey Formal Pant",
-      price: 1250,
-      originalPrice: 1850,
-      image: "https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?q=80&w=1000&auto=format&fit=crop",
-      category: "Formal Pant",
-      rating: 4.7,
-      reviews: 108,
-      fabric: "Premium Tropical",
-      fit: "Slim Fit",
-      description: "Versatile charcoal grey pant for daily office wear.",
-      sizes: ["28", "30", "32", "34", "36", "38", "40"],
-      colors: ["Grey", "Charcoal"],
-      stock: 50
-    },
-    {
-      id: 'default_black_pant',
-      name: "Jet Black Executive Formal Pant",
-      price: 1250,
-      originalPrice: 1850,
-      image: "https://images.unsplash.com/photo-1479064555552-3ef4979f8908?q=80&w=1000&auto=format&fit=crop",
-      category: "Formal Pant",
-      rating: 4.9,
-      reviews: 136,
-      fabric: "Premium Tropical",
-      fit: "Slim Fit",
-      description: "Classic deep black formal pant with refined tailoring.",
-      sizes: ["28", "30", "32", "34", "36", "38", "40"],
-      colors: ["Black"],
-      stock: 60
-    },
-    {
-      id: 'default_beige_pant',
-      name: "Cream Khaki Formal Pant",
-      price: 1250,
-      originalPrice: 1850,
-      image: "https://images.unsplash.com/photo-1506629082955-511b1aa562c8?q=80&w=1000&auto=format&fit=crop",
-      category: "Formal Pant",
-      rating: 4.8,
-      reviews: 94,
-      fabric: "Cotton Blend",
-      fit: "Slim Fit",
-      description: "Sophisticated khaki formal pant for versatile styling.",
-      sizes: ["28", "30", "32", "34", "36", "38", "40"],
-      colors: ["Khaki", "Beige"],
-      stock: 40
-    },
-    {
-      id: 'default_black_shirt',
-      name: "Midnight Black Formal Shirt",
-      price: 1650,
-      originalPrice: 2250,
-      image: "https://images.unsplash.com/photo-1603252109303-2751441dd157?q=80&w=1000&auto=format&fit=crop",
-      category: "Formal Shirt",
-      rating: 4.8,
-      reviews: 74,
-      fabric: "Oxford Cotton",
-      fit: "Slim Fit",
-      description: "Elegant black shirt for evening events and formal meetings.",
-      sizes: ["M", "L", "XL", "XXL"],
-      colors: ["Black"],
-      stock: 30
-    },
-    {
-      id: 'default_pink_shirt',
-      name: "Light Pink Formal Shirt",
-      price: 1450,
-      originalPrice: 1950,
-      image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?q=80&w=1000&auto=format&fit=crop",
-      category: "Formal Shirt",
-      rating: 4.7,
-      reviews: 65,
-      fabric: "Premium Cotton",
-      fit: "Regular Fit",
-      description: "Sophisticated light pink shirt for a modern look.",
-      sizes: ["M", "L", "XL", "XXL"],
-      colors: ["Pink"],
-      stock: 25
-    },
-    {
-      id: 'default_striped_shirt',
-      name: "Striped Executive Shirt",
-      price: 1750,
-      originalPrice: 2450,
-      image: "https://images.unsplash.com/photo-1593030761757-71fae45fa0e7?q=80&w=1000&auto=format&fit=crop",
-      category: "Formal Shirt",
-      rating: 4.9,
-      reviews: 58,
-      fabric: "Italian Cotton",
-      fit: "Slim Fit",
-      description: "Premium striped shirt for the bold professional.",
-      sizes: ["M", "L", "XL", "XXL"],
-      colors: ["Striped Navy"],
-      stock: 20
-    }
-  ];
+  const defaultProducts: Product[] = initialProductsData as Product[];
 
   const defaultBanners: Banner[] = [
     {
       id: 'default_hero_banner',
-      image: 'https://images.unsplash.com/photo-1490515642209-717d61d5b0f0?auto=format&fit=crop&q=80&w=1920&h=700',
-      mobile_image: 'https://images.unsplash.com/photo-1490515642209-717d61d5b0f0?auto=format&fit=crop&q=80&w=800&h=900',
+      image: '/banners/hero_desktop.jpg',
+      mobile_image: '/banners/hero_mobile.jpg',
       title: '',
       subtitle: '',
       buttonText: 'SHOP NOW!',
@@ -3827,6 +3661,7 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
       };
 
       if (editingProduct) {
+        await setDoc(doc(db, 'products', editingProduct.id.toString()), dataToSave);
         await saveProductToSupabase({ id: editingProduct.id, ...dataToSave });
         showToast('Product updated successfully', 'success');
         setProducts(prev => {
@@ -3835,8 +3670,9 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
           return updated;
         });
       } else {
-        const newId = 'local_' + Date.now();
+        const newId = 'prod_' + Date.now();
         const newProd = { id: newId, ...dataToSave, rating: 5.0, reviews: 0 };
+        await setDoc(doc(db, 'products', newId), newProd);
         await saveProductToSupabase(newProd);
         showToast('Product added successfully', 'success');
         setProducts(prev => {
@@ -3863,13 +3699,6 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
         stockStatus: 'In Stock',
         category: 'Formal Pant' 
       } as any);
-      fetchProductsFromSupabase().then(res => {
-        if (res && res.length > 0) {
-          setProducts(res as Product[]);
-          initializeMasterStock(res as Product[]);
-          try { localStorage.setItem('elegan_products', JSON.stringify(res)); } catch (e) {}
-        }
-      });
       onRefreshProducts();
     } catch (error) {
       console.error('Error saving product:', error);
@@ -3882,6 +3711,7 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
       message: 'Are you sure you want to delete this product?',
       onConfirm: async () => {
         try {
+          await deleteDoc(doc(db, 'products', id.toString()));
           await deleteProductFromSupabase(id.toString());
           setProducts(prev => {
             const updated = prev.filter(p => p.id !== id);
@@ -4093,6 +3923,7 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
         created_at: new Date().toISOString()
       };
 
+      await setDoc(doc(db, 'banners', bannerId), bannerToSave);
       await saveBannerToSupabase(bannerToSave);
 
       setShowBannerForm(false);
@@ -4125,7 +3956,10 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
       onConfirm: async () => {
         try {
           for (const b of banners) {
-            if (b.id) await deleteBannerFromSupabase(b.id.toString());
+            if (b.id) {
+              await deleteDoc(doc(db, 'banners', b.id.toString()));
+              await deleteBannerFromSupabase(b.id.toString());
+            }
           }
           setBanners([]);
           try { localStorage.setItem('elegan_banners', JSON.stringify([])); } catch (e) {}
@@ -4145,6 +3979,7 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
       message: 'Are you sure you want to delete this banner?',
       onConfirm: async () => {
         try {
+          await deleteDoc(doc(db, 'banners', id.toString()));
           await deleteBannerFromSupabase(id.toString());
           setBanners(prev => {
             const updated = prev.filter(b => b.id !== id);
@@ -6891,7 +6726,16 @@ export default function App() {
     setTimeout(() => setToast(null), 3000);
   };
   const [currentPage, setCurrentPage] = useState(() => localStorage.getItem('elegan_page') || 'home');
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('elegan_products') : null;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return defaultProducts;
+  });
   const [banners, setBanners] = useState<Banner[]>(() => {
     const saved = localStorage.getItem('elegan_banners');
     if (saved) {
@@ -6995,15 +6839,34 @@ export default function App() {
         } catch (e) {}
       }
 
-      const supaData = await fetchProductsFromSupabase();
-      if (supaData && supaData.length > 0) {
-        setProducts(supaData as Product[]);
-        try { localStorage.setItem('elegan_products', JSON.stringify(supaData)); } catch (e) {}
+      // 1. Fetch from Firestore first (source of truth with all user data)
+      let loadedProducts: Product[] | null = null;
+      try {
+        const pSnap = await getDocs(collection(db, 'products'));
+        if (pSnap && !pSnap.empty && pSnap.docs.length > 0) {
+          loadedProducts = pSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
+        }
+      } catch (fErr) {
+        console.warn('Firestore fetch products notice:', fErr);
+      }
+
+      // 2. Fall back to Supabase if Firestore is empty
+      if (!loadedProducts || loadedProducts.length === 0) {
+        const supaData = await fetchProductsFromSupabase();
+        if (supaData && supaData.length > 0) {
+          loadedProducts = supaData as Product[];
+        }
+      }
+
+      if (loadedProducts && loadedProducts.length > 0) {
+        setProducts(loadedProducts);
+        try { localStorage.setItem('elegan_products', JSON.stringify(loadedProducts)); } catch (e) {}
+        syncProductsToSupabase(loadedProducts);
       } else if (!saved) {
         setProducts(defaultProducts);
       }
     } catch (err) {
-      console.warn('Supabase fetch products notice:', err);
+      console.warn('Fetch products general notice:', err);
       const saved = localStorage.getItem('elegan_products');
       if (saved) {
         try {
@@ -7030,15 +6893,33 @@ export default function App() {
         } catch (e) {}
       }
 
-      const supaBanners = await fetchBannersFromSupabase();
-      if (supaBanners && supaBanners.length > 0) {
-        setBanners(supaBanners as Banner[]);
-        try { localStorage.setItem('elegan_banners', JSON.stringify(supaBanners)); } catch (e) {}
+      // 1. Fetch from Firestore first
+      let loadedBanners: Banner[] | null = null;
+      try {
+        const bSnap = await getDocs(collection(db, 'banners'));
+        if (bSnap && !bSnap.empty && bSnap.docs.length > 0) {
+          loadedBanners = bSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Banner[];
+        }
+      } catch (fErr) {
+        console.warn('Firestore fetch banners notice:', fErr);
+      }
+
+      // 2. Fall back to Supabase
+      if (!loadedBanners || loadedBanners.length === 0) {
+        const supaBanners = await fetchBannersFromSupabase();
+        if (supaBanners && supaBanners.length > 0) {
+          loadedBanners = supaBanners as Banner[];
+        }
+      }
+
+      if (loadedBanners && loadedBanners.length > 0) {
+        setBanners(loadedBanners);
+        try { localStorage.setItem('elegan_banners', JSON.stringify(loadedBanners)); } catch (e) {}
       } else if (!saved) {
         setBanners(defaultBanners);
       }
     } catch (err) {
-      console.warn('Supabase fetch banners notice:', err);
+      console.warn('Fetch banners general notice:', err);
       const saved = localStorage.getItem('elegan_banners');
       if (saved) {
         try {
