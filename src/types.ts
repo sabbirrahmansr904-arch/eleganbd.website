@@ -26,6 +26,8 @@ export interface Product {
   stockStatus?: 'In Stock' | 'Out of Stock' | 'Low Stock';
   rating: number;
   reviews: number;
+  is_top_rated?: boolean;
+  isTopRated?: boolean;
 }
 
 export interface CartItem extends Product {
