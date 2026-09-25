@@ -1916,15 +1916,23 @@ const BannerCarousel = ({
     return `w-full h-auto max-h-[360px] sm:max-h-[440px] ${fitClass} md:aspect-[1920/700] md:object-cover md:max-h-none block`;
   };
 
+  const isValidImageUrl = (url?: string) => {
+    if (!url || typeof url !== 'string') return false;
+    const trimmed = url.trim();
+    if (trimmed.length < 5) return false;
+    return trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:image/');
+  };
+
   const fallbackHero = 'https://images.unsplash.com/photo-1594932224456-75a779401e28?q=80&w=2000&auto=format&fit=crop';
 
-  const mobileBannerImg = (currentBanner.mobile_image && currentBanner.mobile_image.trim() !== '') 
-    ? currentBanner.mobile_image.trim() 
-    : (currentBanner.image && currentBanner.image.trim() !== '' ? currentBanner.image.trim() : fallbackHero);
+  const rawMobile = currentBanner.mobile_image;
+  const rawDesktop = currentBanner.image;
 
-  const desktopBannerImg = (currentBanner.image && currentBanner.image.trim() !== '')
-    ? currentBanner.image.trim()
-    : mobileBannerImg;
+  const validMobile = isValidImageUrl(rawMobile) ? rawMobile!.trim() : null;
+  const validDesktop = isValidImageUrl(rawDesktop) ? rawDesktop!.trim() : null;
+
+  const mobileBannerImg = validMobile || validDesktop || fallbackHero;
+  const desktopBannerImg = validDesktop || validMobile || fallbackHero;
 
   return (
     <div 
@@ -8681,8 +8689,14 @@ export default function App() {
       }
 
       if (loadedBanners && loadedBanners.length > 0) {
-        setBanners(loadedBanners);
-        try { localStorage.setItem('elegan_banners', JSON.stringify(loadedBanners)); } catch (e) {}
+        const checkUrl = (u?: string) => u && typeof u === 'string' && u.trim().length >= 5 && (u.trim().startsWith('http://') || u.trim().startsWith('https://') || u.trim().startsWith('data:image/'));
+        const cleaned = loadedBanners.map(b => ({
+          ...b,
+          image: checkUrl(b.image) ? b.image : (checkUrl(b.mobile_image) ? b.mobile_image : defaultBanners[0].image),
+          mobile_image: checkUrl(b.mobile_image) ? b.mobile_image : (checkUrl(b.image) ? b.image : defaultBanners[0].mobile_image)
+        }));
+        setBanners(cleaned);
+        try { localStorage.setItem('elegan_banners', JSON.stringify(cleaned)); } catch (e) {}
       } else if (!saved) {
         setBanners(defaultBanners);
       }
