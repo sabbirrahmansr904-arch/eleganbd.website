@@ -1338,16 +1338,46 @@ const ReviewsPage = ({ onBack }: { onBack: () => void }) => {
   );
 };
 
+const defaultCustomerReviews: CustomerReviewItem[] = [
+  {
+    id: 'def_1',
+    name: 'Tanvir Ahmed',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400&h=400',
+    comment: 'Elegan BD-এর ফর্মাল প্যান্টের ফিটিং এবং কাপড়ের কোয়ালিটি সত্যিই অসাধারণ। দামের তুলনায় অনেক প্রিমিয়াম ফিল দেয়।',
+    rating: 5,
+    date: '2 days ago',
+    product: 'Formal Pant - Black'
+  },
+  {
+    id: 'def_2',
+    name: 'Rakibul Hasan',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=400&h=400',
+    comment: 'অফিসের ব্যবহারের জন্য নিয়েছিলাম। কাপড় খুব আরামদায়ক এবং কালারও পারফেক্ট। সবাই নিতে পারেন।',
+    rating: 5,
+    date: '1 week ago',
+    product: 'Formal Shirt - Navy'
+  },
+  {
+    id: 'def_3',
+    name: 'Shahed Karim',
+    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&q=80&w=400&h=400',
+    comment: 'ডেলিভারি খুবই দ্রুত ছিল এবং সাইজ একদম ঠিকঠাক মিলেছে। ধন্যবাদ Elegan BD টিমকে!',
+    rating: 5,
+    date: '2 weeks ago',
+    product: 'Slim Fit Pant'
+  }
+];
+
 const CustomerReviewsSection = ({ showToast }: { showToast?: (msg: string, type?: 'success' | 'error' | 'info') => void }) => {
   const [reviewsList, setReviewsList] = useState<CustomerReviewItem[]>(() => {
     try {
       const saved = localStorage.getItem('elegan_customer_reviews_v2');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch (e) {}
-    return [];
+    return defaultCustomerReviews;
   });
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -1377,8 +1407,10 @@ const CustomerReviewsSection = ({ showToast }: { showToast?: (msg: string, type?
               product: data.product || ''
             });
           });
-          setReviewsList(items);
-          localStorage.setItem('elegan_customer_reviews_v2', JSON.stringify(items));
+          if (items.length > 0) {
+            setReviewsList(items);
+            localStorage.setItem('elegan_customer_reviews_v2', JSON.stringify(items));
+          }
         }
       } catch (err) {
         console.warn('Fetch reviews notice:', err);
