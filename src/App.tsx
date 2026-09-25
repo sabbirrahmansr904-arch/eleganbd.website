@@ -1916,6 +1916,16 @@ const BannerCarousel = ({
     return `w-full h-auto max-h-[360px] sm:max-h-[440px] ${fitClass} md:aspect-[1920/700] md:object-cover md:max-h-none block`;
   };
 
+  const fallbackHero = 'https://images.unsplash.com/photo-1594932224456-75a779401e28?q=80&w=2000&auto=format&fit=crop';
+
+  const mobileBannerImg = (currentBanner.mobile_image && currentBanner.mobile_image.trim() !== '') 
+    ? currentBanner.mobile_image.trim() 
+    : (currentBanner.image && currentBanner.image.trim() !== '' ? currentBanner.image.trim() : fallbackHero);
+
+  const desktopBannerImg = (currentBanner.image && currentBanner.image.trim() !== '')
+    ? currentBanner.image.trim()
+    : mobileBannerImg;
+
   return (
     <div 
       className="relative w-full bg-zinc-950 overflow-hidden flex items-center justify-center"
@@ -1933,26 +1943,34 @@ const BannerCarousel = ({
           {(currentBanner.title || currentBanner.subtitle) && (
             <div className="absolute inset-0 bg-black/35 z-10 pointer-events-none" />
           )}
-          <picture className="w-full block">
-            <source
-              media="(max-width: 767px)"
-              srcSet={currentBanner.mobile_image || currentBanner.image}
-            />
-            <img
-              src={currentBanner.image || currentBanner.mobile_image || 'https://images.unsplash.com/photo-1594932224456-75a779401e28?q=80&w=2000&auto=format&fit=crop'}
-              alt={currentBanner.title || 'Hero Banner'}
-              className={getMobileClasses()}
-              loading="eager"
-              decoding="async"
-              referrerPolicy="no-referrer"
-              onError={(e) => {
-                const target = e.currentTarget as HTMLImageElement;
-                if (!target.src.includes('unsplash.com')) {
-                  target.src = 'https://images.unsplash.com/photo-1594932224456-75a779401e28?q=80&w=2000&auto=format&fit=crop';
-                }
-              }}
-            />
-          </picture>
+          {/* Mobile Banner Image (< 768px) */}
+          <img
+            src={mobileBannerImg}
+            alt={currentBanner.title || 'Hero Banner'}
+            className={`${getMobileClasses()} md:hidden`}
+            loading="eager"
+            decoding="async"
+            referrerPolicy="no-referrer"
+            onError={(e) => {
+              const target = e.currentTarget as HTMLImageElement;
+              target.onerror = null;
+              target.src = fallbackHero;
+            }}
+          />
+          {/* Desktop Banner Image (>= 768px) */}
+          <img
+            src={desktopBannerImg}
+            alt={currentBanner.title || 'Hero Banner'}
+            className={`${getMobileClasses()} hidden md:block`}
+            loading="eager"
+            decoding="async"
+            referrerPolicy="no-referrer"
+            onError={(e) => {
+              const target = e.currentTarget as HTMLImageElement;
+              target.onerror = null;
+              target.src = fallbackHero;
+            }}
+          />
           {(currentBanner.title || currentBanner.subtitle) && (
             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center px-4 pointer-events-none">
               {currentBanner.title && (
