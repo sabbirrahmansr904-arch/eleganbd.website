@@ -1934,14 +1934,12 @@ const BannerCarousel = ({
             <div className="absolute inset-0 bg-black/35 z-10 pointer-events-none" />
           )}
           <picture className="w-full block">
-            {currentBanner.mobile_image && (
-              <source
-                media="(max-width: 767px)"
-                srcSet={currentBanner.mobile_image}
-              />
-            )}
+            <source
+              media="(max-width: 767px)"
+              srcSet={currentBanner.mobile_image || currentBanner.image}
+            />
             <img
-              src={currentBanner.image || currentBanner.mobile_image || '/banners/hero_desktop.jpg'}
+              src={currentBanner.image || currentBanner.mobile_image || 'https://images.unsplash.com/photo-1594932224456-75a779401e28?q=80&w=2000&auto=format&fit=crop'}
               alt={currentBanner.title || 'Hero Banner'}
               className={getMobileClasses()}
               loading="eager"
@@ -1949,8 +1947,8 @@ const BannerCarousel = ({
               referrerPolicy="no-referrer"
               onError={(e) => {
                 const target = e.currentTarget as HTMLImageElement;
-                if (!target.src.includes('/banners/hero_desktop.jpg')) {
-                  target.src = '/banners/hero_desktop.jpg';
+                if (!target.src.includes('unsplash.com')) {
+                  target.src = 'https://images.unsplash.com/photo-1594932224456-75a779401e28?q=80&w=2000&auto=format&fit=crop';
                 }
               }}
             />
@@ -2496,24 +2494,25 @@ const parseProductColors = (colors: any): string[] => {
   return ['Standard'];
 };
 
-const ProductDetails = ({ product, onAddToCart, onBack, onBuyNow, user, showToast, onNavigate, onCategoryClick }: { 
+const ProductDetails = ({ product, products, onAddToCart, onBack, onBuyNow, user, showToast, onNavigate, onCategoryClick, onSelectProduct, userWishlist, onToggleWishlist }: { 
   product: Product, 
+  products?: Product[],
   onAddToCart: (p: Product, size: any, color?: string) => void, 
   onBack: () => void,
   onBuyNow: (p: Product, size: any, color?: string) => void,
   user: User | null,
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void,
   onNavigate?: (page: string) => void,
-  onCategoryClick?: (category: string) => void
+  onCategoryClick?: (category: string) => void,
+  onSelectProduct?: (p: Product) => void,
+  userWishlist?: string[],
+  onToggleWishlist?: (e: React.MouseEvent, p: Product) => void
 }) => {
   const [selectedSize, setSelectedSize] = useState<any>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [activeImage, setActiveImage] = useState(product.image);
   const [zoomPos, setZoomPos] = useState({ x: 0, y: 0 });
   const [isZoomed, setIsZoomed] = useState(false);
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [newReview, setNewReview] = useState({ user_name: '', rating: 5, comment: '' });
-  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   const getImages = (images: any, primaryImage?: string) => {
     let list: string[] = [];
@@ -2544,53 +2543,29 @@ const ProductDetails = ({ product, onAddToCart, onBack, onBuyNow, user, showToas
     }
   }, [product.id, product.image, JSON.stringify(product.images)]);
 
-  useEffect(() => {
-    fetchReviews();
-  }, [product.id]);
-
-  const fetchReviews = async () => {
-    try {
-      const q = query(collection(db, 'reviews'), where('product_id', '==', product.id.toString()));
-      const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setReviews(data as any);
-    } catch (err) {
-      console.error('Failed to fetch reviews:', err);
-    }
-  };
-
-  const handleReviewSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newReview.user_name || !newReview.comment) {
-      showToast('Please fill in all fields', 'error');
-      return;
-    }
-
-    setIsSubmittingReview(true);
-    try {
-      const reviewData = {
-        product_id: product.id.toString(),
-        user_name: newReview.user_name,
-        rating: newReview.rating,
-        comment: newReview.comment,
-        date: new Date().toISOString()
-      };
-      await addDoc(collection(db, 'reviews'), reviewData);
-      setReviews([reviewData as any, ...reviews]);
-      setNewReview({ user_name: '', rating: 5, comment: '' });
-    } catch (error) {
-      console.error('Failed to submit review:', error);
-      showToast('Failed to submit review', 'error');
-    } finally {
-      setIsSubmittingReview(false);
-    }
-  };
-
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
     const x = ((e.pageX - left) / width) * 100;
     const y = ((e.pageY - top) / height) * 100;
     setZoomPos({ x, y });
+  };
+
+  const getDynamicDescription = () => {
+    if (product.description && product.description.trim() !== '') {
+      return product.description.trim();
+    }
+
+    const nameAndCat = `${product.name || ''} ${product.category || ''}`.toLowerCase();
+    
+    if (nameAndCat.includes('pant') || nameAndCat.includes('trouser')) {
+      return `Elevate your everyday formal style with our premium export-quality formal pant. Designed with a smart straight fit, smooth fabric, and clean finishing, it offers lasting comfort and a polished look. Perfect for office wear, business meetings, and special occasions.\n\nFeatures:\n\n- Premium export-quality fabric\n- Comfortable straight fit\n- Smart and elegant design\n- Durable stitching and neat finishing\n- Suitable for formal and professional wear`;
+    }
+
+    if (nameAndCat.includes('shirt')) {
+      return `Elevate your everyday formal style with our premium export-quality formal shirt. Designed with a sleek fit, smooth breathable fabric, and clean finishing, it offers lasting comfort and a sharp look. Perfect for office wear, corporate meetings, and special occasions.\n\nFeatures:\n\n- Premium export-quality fabric\n- Breathable and comfortable fit\n- Smart and elegant design\n- Neat stitching and durable buttons\n- Suitable for formal and professional wear`;
+    }
+
+    return `Elevate your everyday formal style with our premium export-quality collection. Designed with a tailored fit, smooth fabric, and clean finishing, it offers lasting comfort and a polished look.\n\nFeatures:\n\n- Premium export-quality fabric\n- Comfortable tailored fit\n- Smart and elegant design\n- Durable stitching and neat finishing\n- Suitable for formal and professional wear`;
   };
 
   return (
@@ -2607,7 +2582,7 @@ const ProductDetails = ({ product, onAddToCart, onBack, onBuyNow, user, showToas
         {/* Images */}
         <div className="space-y-4">
           <div 
-            className="bg-white overflow-hidden relative cursor-zoom-in rounded-2xl border border-zinc-100"
+            className="bg-white overflow-hidden relative cursor-zoom-in rounded-2xl border border-zinc-100 shadow-xs"
             onMouseEnter={() => setIsZoomed(true)}
             onMouseLeave={() => setIsZoomed(false)}
             onMouseMove={handleMouseMove}
@@ -2630,7 +2605,7 @@ const ProductDetails = ({ product, onAddToCart, onBack, onBuyNow, user, showToas
                 <button 
                   key={idx}
                   onClick={() => setActiveImage(img)}
-                  className={`aspect-square border-2 rounded-xl overflow-hidden transition-all ${activeImage === img ? 'border-zinc-900 ring-2 ring-zinc-900/10 scale-102' : 'border-zinc-200 hover:border-zinc-400 opacity-75 hover:opacity-100'}`}
+                  className={`aspect-square border-2 rounded-xl overflow-hidden transition-all cursor-pointer ${activeImage === img ? 'border-zinc-900 ring-2 ring-zinc-900/10 scale-102' : 'border-zinc-200 hover:border-zinc-400 opacity-75 hover:opacity-100'}`}
                 >
                   <img src={img || null} alt={`${product.name} ${idx + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?q=80&w=800&auto=format&fit=crop'; }} />
                 </button>
@@ -2641,24 +2616,21 @@ const ProductDetails = ({ product, onAddToCart, onBack, onBuyNow, user, showToas
 
         {/* Info */}
         <div className="flex flex-col">
-          <h1 className="text-3xl font-serif font-bold text-zinc-900 mb-2">{product.name}</h1>
-          <div className="flex items-center gap-4 mb-6">
-            <div className="flex items-center text-zinc-900">
-              <Star size={16} fill="currentColor" />
-              <span className="ml-1 text-sm font-bold">{product.rating}</span>
-            </div>
-            <span className="text-zinc-400 text-sm">({product.reviews} Reviews)</span>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="px-2.5 py-1 bg-zinc-100 text-zinc-700 rounded-md text-[10px] font-bold uppercase tracking-wider">{product.category || 'Formal Wear'}</span>
+            <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-md text-[10px] font-bold uppercase tracking-wider">{product.stockStatus || 'In Stock'}</span>
           </div>
+          <h1 className="text-3xl font-serif font-bold text-zinc-900 mb-3">{product.name}</h1>
 
-          <div className="flex items-center gap-4 mb-8">
-            <span className="text-2xl font-bold text-zinc-900">৳{product.price}</span>
+          <div className="flex items-center gap-4 mb-6">
+            <span className="text-3xl font-bold font-sans text-zinc-950">৳{product.price}</span>
             {product.originalPrice > product.price && (
-              <span className="text-lg text-zinc-400 line-through">৳{product.originalPrice}</span>
+              <span className="text-lg text-zinc-400 line-through font-sans">৳{product.originalPrice}</span>
             )}
           </div>
 
           <div className="mb-8">
-            <h4 className="text-sm font-bold uppercase tracking-widest mb-4">Select Size</h4>
+            <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-600 mb-3">Select Size</h4>
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
               {parseProductSizes(product.sizes, product.category, product.name).map(size => {
                 let isOutOfStock = false;
@@ -2674,7 +2646,7 @@ const ProductDetails = ({ product, onAddToCart, onBack, onBuyNow, user, showToas
                     <button
                       key={size}
                       disabled
-                      className="py-3 text-sm font-medium border border-zinc-100 bg-zinc-50 text-zinc-300 line-through cursor-not-allowed rounded-lg"
+                      className="py-3 text-sm font-medium border border-zinc-100 bg-zinc-50 text-zinc-300 line-through cursor-not-allowed rounded-xl"
                     >
                       {size}
                     </button>
@@ -2686,7 +2658,7 @@ const ProductDetails = ({ product, onAddToCart, onBack, onBuyNow, user, showToas
                     key={size}
                     type="button"
                     onClick={() => setSelectedSize(size)}
-                    className={`py-3 text-sm font-medium border rounded-lg transition-all cursor-pointer ${selectedSize === size ? 'bg-zinc-900 text-white border-zinc-900 shadow-md scale-102 font-bold' : 'border-zinc-200 text-zinc-700 hover:border-zinc-900 hover:bg-zinc-50'}`}
+                    className={`py-3 text-sm font-medium border rounded-xl transition-all cursor-pointer ${selectedSize === size ? 'bg-zinc-900 text-white border-zinc-900 shadow-md scale-102 font-bold' : 'border-zinc-200 text-zinc-700 hover:border-zinc-900 hover:bg-zinc-50'}`}
                   >
                     {size}
                   </button>
@@ -2695,143 +2667,95 @@ const ProductDetails = ({ product, onAddToCart, onBack, onBuyNow, user, showToas
             </div>
           </div>
 
-          <div className="mb-10">
-            <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-2">Description</h4>
-            <p className="text-zinc-600 leading-relaxed whitespace-pre-line text-sm">
-              {product.description || 'Premium quality formal wear tailored for comfort, style, and everyday elegance.'}
-            </p>
+          {/* Desktop Description right below size */}
+          <div className="hidden md:block my-6 bg-zinc-50 border border-zinc-200/80 rounded-2xl p-5 shadow-2xs">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-900 mb-2.5 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-zinc-900" />
+              Description
+            </h4>
+            <div className="text-zinc-700 leading-relaxed text-sm whitespace-pre-line font-normal">
+              {getDynamicDescription()}
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 mt-auto">
             <button 
               onClick={() => selectedSize && onAddToCart(product, selectedSize, selectedColor || undefined)}
               disabled={!selectedSize}
-              className="flex-1 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 btn-primary py-4 text-xs font-bold uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               Add to Cart
             </button>
             <button 
               onClick={() => selectedSize && onBuyNow(product, selectedSize, selectedColor || undefined)}
               disabled={!selectedSize}
-              className="flex-1 btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 btn-secondary py-4 text-xs font-bold uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               Buy Now
             </button>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 mt-12 pt-8 border-t border-zinc-100">
+          <div className="grid grid-cols-3 gap-4 mt-10 pt-8 border-t border-zinc-100">
             <div className="text-center">
-              <Truck size={20} className="mx-auto mb-2 text-zinc-400" />
-              <span className="text-[10px] font-bold uppercase tracking-widest">Fast Delivery</span>
+              <Truck size={22} className="mx-auto mb-2 text-zinc-800" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Fast Delivery</span>
             </div>
             <div className="text-center">
-              <ShieldCheck size={20} className="mx-auto mb-2 text-zinc-400" />
-              <span className="text-[10px] font-bold uppercase tracking-widest">Secure Checkout</span>
+              <ShieldCheck size={22} className="mx-auto mb-2 text-zinc-800" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Secure Checkout</span>
             </div>
             <div className="text-center">
-              <RefreshCw size={20} className="mx-auto mb-2 text-zinc-400" />
-              <span className="text-[10px] font-bold uppercase tracking-widest">Easy Return</span>
+              <RefreshCw size={22} className="mx-auto mb-2 text-zinc-800" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Easy Return</span>
+            </div>
+          </div>
+
+          {/* Mobile Description right below Buy Now */}
+          <div className="block md:hidden mt-6 bg-zinc-50 border border-zinc-200/80 rounded-2xl p-5 shadow-2xs">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-900 mb-2.5 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-zinc-900" />
+              Description
+            </h4>
+            <div className="text-zinc-700 leading-relaxed text-sm whitespace-pre-line font-normal">
+              {getDynamicDescription()}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Reviews Section */}
-      <div className="mt-24 border-t border-zinc-100 pt-16">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-16">
-          {/* Review Stats & Form */}
-          <div className="lg:col-span-1">
-            <h2 className="text-2xl font-serif font-bold text-zinc-900 mb-6">Customer Reviews</h2>
-            <div className="flex items-center gap-4 mb-8">
-              <div className="text-5xl font-bold text-zinc-900">{product.rating}</div>
-              <div>
-                <div className="flex text-zinc-900 mb-1">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} size={16} fill={i < Math.round(product.rating) ? "currentColor" : "none"} />
-                  ))}
-                </div>
-                <p className="text-sm text-zinc-500">Based on {reviews.length} reviews</p>
-              </div>
-            </div>
-
-            {/* Review Form */}
-            <div className="bg-zinc-50 p-6 rounded-2xl">
-              <h3 className="font-bold uppercase tracking-widest text-xs mb-4">Write a Review</h3>
-              {user ? (
-                <form onSubmit={handleReviewSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">Rating</label>
-                    <div className="flex gap-2">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          key={star}
-                          type="button"
-                          onClick={() => setNewReview({ ...newReview, rating: star })}
-                          className={`p-1 transition-colors ${newReview.rating >= star ? 'text-zinc-900' : 'text-zinc-300'}`}
-                        >
-                          <Star size={20} fill={newReview.rating >= star ? "currentColor" : "none"} />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">Comment</label>
-                    <textarea
-                      value={newReview.comment}
-                      onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
-                      className="w-full bg-white border border-zinc-200 rounded-lg p-3 text-sm focus:outline-none focus:border-zinc-900 min-h-[100px]"
-                      placeholder="Share your thoughts about this product..."
-                      required
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={isSubmittingReview}
-                    className="w-full btn-primary py-3 text-xs"
-                  >
-                    {isSubmittingReview ? 'Submitting...' : 'Submit Review'}
-                  </button>
-                </form>
-              ) : (
-                <div className="text-center py-4">
-                  <p className="text-sm text-zinc-600 mb-4">Please login to share your experience with this product.</p>
-                </div>
-              )}
-            </div>
+      {/* Related Products Section */}
+      {products && products.length > 0 && (
+        <div className="mt-24 border-t border-zinc-200 pt-16">
+          <div className="text-center mb-10">
+            <h3 className="text-2xl sm:text-3xl font-serif font-bold text-zinc-900 uppercase tracking-tight">
+              Related Products
+            </h3>
+            <p className="text-xs sm:text-sm text-zinc-500 uppercase tracking-widest mt-2">
+              You might also like these matching styles
+            </p>
           </div>
-
-          {/* Review List */}
-          <div className="lg:col-span-2">
-            <div className="space-y-8">
-              {reviews.length > 0 ? (
-                reviews.map((review) => (
-                  <div key={review.id} className="border-b border-zinc-100 pb-8 last:border-0">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h4 className="font-bold text-zinc-900">{review.user_name}</h4>
-                        <div className="flex text-zinc-900 mt-1">
-                          {[...Array(5)].map((_, i) => (
-                            <Star key={i} size={12} fill={i < review.rating ? "currentColor" : "none"} />
-                          ))}
-                        </div>
-                      </div>
-                      <span className="text-xs text-zinc-400">
-                        {new Date(review.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <p className="text-zinc-600 text-sm leading-relaxed">{review.comment}</p>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-12 bg-zinc-50 rounded-2xl">
-                  <MessageCircle size={40} className="mx-auto mb-4 text-zinc-300" />
-                  <p className="text-zinc-500">No reviews yet. Be the first to review this product!</p>
-                </div>
-              )}
-            </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+            {products
+              .filter(p => p.id.toString() !== product.id.toString() && (!product.category || p.category === product.category))
+              .slice(0, 4)
+              .map(related => {
+                const isWishlisted = userWishlist?.includes(String(related.id));
+                return (
+                  <ProductCard
+                    key={related.id}
+                    product={related}
+                    onSelect={(p) => {
+                      onSelectProduct?.(p);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    isWishlisted={isWishlisted}
+                    onToggleWishlist={onToggleWishlist}
+                  />
+                );
+              })}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
@@ -3380,14 +3304,14 @@ const CheckoutPage = ({
   const defaultBanners: Banner[] = [
     {
       id: 'default_hero_banner',
-      image: '/banners/hero_desktop.jpg',
-      mobile_image: '/banners/hero_mobile.jpg',
+      image: 'https://images.unsplash.com/photo-1594932224456-75a779401e28?q=80&w=2000&auto=format&fit=crop',
+      mobile_image: 'https://images.unsplash.com/photo-1594932224456-75a779401e28?q=80&w=1000&auto=format&fit=crop',
       mobile_ratio: '16/9',
       mobile_fit: 'cover',
-      title: '',
-      subtitle: '',
-      buttonText: '',
-      link: '/shop'
+      title: 'CRAFTED FOR ELEGANCE',
+      subtitle: 'Discover premium formal wear designed for the modern gentleman.',
+      buttonText: 'SHOP NOW',
+      link: 'shop'
     }
   ];
 
@@ -4283,28 +4207,34 @@ const AdminPanel = ({
   const [savedProductSuccess, setSavedProductSuccess] = useState<{ [productId: string]: boolean }>({});
 
   const initializeMasterStock = (items: Product[]) => {
-    const initEdits: typeof masterStockEdits = {};
-    items.forEach(p => {
-      const pSizes = parseProductSizes(p.sizes, p.category, p.name);
-      const pColors = parseProductColors(p.colors);
-      
-      const baseMap = p.stockMap ? JSON.parse(JSON.stringify(p.stockMap)) : {};
-      pColors.forEach(c => {
-        if (!baseMap[c]) baseMap[c] = {};
-        pSizes.forEach(s => {
-          if (typeof baseMap[c][s] !== 'number') {
-            baseMap[c][s] = 0;
-          }
+    setMasterStockEdits(prev => {
+      const initEdits: typeof masterStockEdits = { ...prev };
+      items.forEach(p => {
+        const pIdStr = p.id.toString();
+        if (initEdits[pIdStr]?.hasChanges) {
+          return;
+        }
+        const pSizes = parseProductSizes(p.sizes, p.category, p.name);
+        const pColors = parseProductColors(p.colors);
+        
+        const baseMap = p.stockMap ? JSON.parse(JSON.stringify(p.stockMap)) : {};
+        pColors.forEach(c => {
+          if (!baseMap[c]) baseMap[c] = {};
+          pSizes.forEach(s => {
+            if (typeof baseMap[c][s] !== 'number') {
+              baseMap[c][s] = 0;
+            }
+          });
         });
-      });
 
-      initEdits[p.id.toString()] = {
-        stockMap: baseMap,
-        stockStatus: p.stockStatus || 'In Stock',
-        hasChanges: false
-      };
+        initEdits[pIdStr] = {
+          stockMap: baseMap,
+          stockStatus: p.stockStatus || 'In Stock',
+          hasChanges: false
+        };
+      });
+      return initEdits;
     });
-    setMasterStockEdits(initEdits);
   };
 
   const [confirmDialog, setConfirmDialog] = useState<{isOpen: boolean, message: string, onConfirm: () => void}>({isOpen: false, message: '', onConfirm: () => {}});
@@ -4401,9 +4331,20 @@ const AdminPanel = ({
           }
 
           if (loaded && loaded.length > 0) {
-            setProducts(loaded);
-            initializeMasterStock(loaded);
-            try { localStorage.setItem('elegan_products', JSON.stringify(loaded)); } catch (e) {}
+            let existingLocal: Product[] = [];
+            try {
+              const raw = localStorage.getItem('elegan_products');
+              if (raw) existingLocal = JSON.parse(raw);
+            } catch (e) {}
+
+            const mergedMap = new Map<string, Product>();
+            existingLocal.forEach(p => { if (p && p.id) mergedMap.set(p.id.toString(), p); });
+            loaded.forEach(p => { if (p && p.id) mergedMap.set(p.id.toString(), p); });
+
+            const finalMerged = Array.from(mergedMap.values());
+            setProducts(finalMerged);
+            initializeMasterStock(finalMerged);
+            try { localStorage.setItem('elegan_products', JSON.stringify(finalMerged)); } catch (e) {}
           }
         };
         syncFreshProducts();
@@ -7024,7 +6965,7 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
                           <input 
                             type="checkbox" 
                             checked={Boolean(productFormData.is_top_rated || productFormData.isTopRated)} 
-                            onChange={(e) => setProductFormData({ ...productFormData, is_top_rated: e.target.checked, isTopRated: e.target.checked })} 
+                            onChange={(e) => setProductFormData(prev => ({ ...prev, is_top_rated: e.target.checked, isTopRated: e.target.checked }))} 
                             className="sr-only peer"
                           />
                           <div className="w-11 h-6 bg-zinc-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
@@ -7033,7 +6974,7 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
 
                       <div className="md:col-span-2">
                         <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Product Name</label>
-                        <input required className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900" value={productFormData.name} onChange={e => setProductFormData({...productFormData, name: e.target.value})} />
+                        <input required className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900" value={productFormData.name} onChange={e => setProductFormData(prev => ({ ...prev, name: e.target.value }))} />
                       </div>
                       <div className="md:col-span-2">
                         <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Category</label>
@@ -7042,9 +6983,9 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
                           const isShirt = newCat.toLowerCase().includes('shirt');
                           const autoSizes = isShirt ? 'M, L, XL, XXL' : '28, 30, 32, 34, 36, 38, 40';
                           if (newCat === 'Cuban Shirt') {
-                            setProductFormData({...productFormData, category: newCat, sizes: autoSizes, price: 599, originalPrice: 599});
+                            setProductFormData(prev => ({ ...prev, category: newCat, sizes: autoSizes, price: 599, originalPrice: 599 }));
                           } else {
-                            setProductFormData({...productFormData, category: newCat, sizes: autoSizes});
+                            setProductFormData(prev => ({ ...prev, category: newCat, sizes: autoSizes }));
                           }
                         }}>
                           {categories.map(cat => (
@@ -7054,19 +6995,19 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
                       </div>
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Price (৳)</label>
-                        <input required type="number" className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900" value={productFormData.price} onChange={e => setProductFormData({...productFormData, price: parseInt(e.target.value) || 0})} />
+                        <input required type="number" className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900" value={productFormData.price} onChange={e => setProductFormData(prev => ({ ...prev, price: parseInt(e.target.value) || 0 }))} />
                       </div>
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Discount Price (৳)</label>
-                        <input required type="number" className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900" value={productFormData.originalPrice} onChange={e => setProductFormData({...productFormData, originalPrice: parseInt(e.target.value) || 0})} />
+                        <input required type="number" className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900" value={productFormData.originalPrice} onChange={e => setProductFormData(prev => ({ ...prev, originalPrice: parseInt(e.target.value) || 0 }))} />
                       </div>
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Stock Quantity</label>
-                        <input required type="number" className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900" value={productFormData.stock} onChange={e => setProductFormData({...productFormData, stock: parseInt(e.target.value) || 0})} />
+                        <input required type="number" className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900" value={productFormData.stock} onChange={e => setProductFormData(prev => ({ ...prev, stock: parseInt(e.target.value) || 0 }))} />
                       </div>
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Stock Status</label>
-                        <select className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900 bg-transparent" value={productFormData.stockStatus} onChange={e => setProductFormData({...productFormData, stockStatus: e.target.value as any})}>
+                        <select className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900 bg-transparent" value={productFormData.stockStatus} onChange={e => setProductFormData(prev => ({ ...prev, stockStatus: e.target.value as any }))}>
                           <option value="In Stock">In Stock</option>
                           <option value="Out of Stock">Out of Stock</option>
                           <option value="Low Stock">Low Stock</option>
@@ -7074,7 +7015,7 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
                       </div>
                       <div className="md:col-span-2">
                         <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Colors (comma separated)</label>
-                        <input className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900" value={productFormData.colors} onChange={e => setProductFormData({...productFormData, colors: e.target.value})} placeholder="Black, Navy, Grey" />
+                        <input className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900" value={productFormData.colors} onChange={e => setProductFormData(prev => ({ ...prev, colors: e.target.value }))} placeholder="Black, Navy, Grey" />
                       </div>
                       <div className="md:col-span-2 bg-zinc-50 p-4 rounded-xl border border-zinc-200">
                         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-3">
@@ -7223,7 +7164,7 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
                       </div>
                       <div className="md:col-span-2">
                         <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Description (বিবরণ)</label>
-                        <textarea className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900 text-sm" value={productFormData.description} onChange={e => setProductFormData({...productFormData, description: e.target.value})} rows={4} placeholder="Write product description..." />
+                        <textarea className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900 text-sm" value={productFormData.description || ''} onChange={e => { const val = e.target.value; setProductFormData(prev => ({ ...prev, description: val })); }} rows={4} placeholder="Write product description..." />
                       </div>
                       <div className="md:col-span-2">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2">
@@ -7232,21 +7173,21 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
                             <span className="text-[10px] text-zinc-400 font-medium">Quick Presets:</span>
                             <button 
                               type="button" 
-                              onClick={() => setProductFormData({ ...productFormData, sizes: '28, 30, 32, 34, 36, 38, 40' })}
+                              onClick={() => setProductFormData(prev => ({ ...prev, sizes: '28, 30, 32, 34, 36, 38, 40' }))}
                               className="px-2 py-0.5 bg-zinc-100 hover:bg-zinc-900 hover:text-white rounded text-[10px] font-bold transition-colors cursor-pointer"
                             >
                               Pant (28-40)
                             </button>
                             <button 
                               type="button" 
-                              onClick={() => setProductFormData({ ...productFormData, sizes: 'M, L, XL, XXL' })}
+                              onClick={() => setProductFormData(prev => ({ ...prev, sizes: 'M, L, XL, XXL' }))}
                               className="px-2 py-0.5 bg-zinc-100 hover:bg-zinc-900 hover:text-white rounded text-[10px] font-bold transition-colors cursor-pointer"
                             >
                               Shirt (M-XXL)
                             </button>
                           </div>
                         </div>
-                        <input className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900 text-sm font-medium" value={productFormData.sizes} onChange={e => setProductFormData({...productFormData, sizes: e.target.value})} placeholder="28, 30, 32, 34, 36, 38, 40 or M, L, XL, XXL" />
+                        <input className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900 text-sm font-medium" value={productFormData.sizes} onChange={e => { const val = e.target.value; setProductFormData(prev => ({ ...prev, sizes: val })); }} placeholder="28, 30, 32, 34, 36, 38, 40 or M, L, XL, XXL" />
                       </div>
 
                       {/* Inventory Management Section */}
@@ -7296,20 +7237,22 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
                                         key={amt}
                                         type="button"
                                         onClick={() => {
-                                          const updated = { ...(productFormData.stockMap || {}) };
-                                          updated[color] = updated[color] ? { ...updated[color] } : {};
-                                          parsedFormSizes.forEach(s => {
-                                            updated[color][s] = amt;
-                                          });
-                                          let sum = 0;
-                                          Object.values(updated).forEach(sMap => {
-                                            Object.values(sMap || {}).forEach(q => { sum += (Number(q) || 0); });
-                                          });
-                                          setProductFormData({
-                                            ...productFormData,
-                                            stockMap: updated,
-                                            stock: sum,
-                                            stockStatus: sum === 0 ? 'Out of Stock' : sum <= 10 ? 'Low Stock' : 'In Stock'
+                                          setProductFormData(prev => {
+                                            const updated = { ...(prev.stockMap || {}) };
+                                            updated[color] = updated[color] ? { ...updated[color] } : {};
+                                            parsedFormSizes.forEach(s => {
+                                              updated[color][s] = amt;
+                                            });
+                                            let sum = 0;
+                                            Object.values(updated).forEach(sMap => {
+                                              Object.values(sMap || {}).forEach(q => { sum += (Number(q) || 0); });
+                                            });
+                                            return {
+                                              ...prev,
+                                              stockMap: updated,
+                                              stock: sum,
+                                              stockStatus: sum === 0 ? 'Out of Stock' : sum <= 10 ? 'Low Stock' : 'In Stock'
+                                            };
                                           });
                                         }}
                                         className="px-2 py-0.5 text-[10px] font-bold bg-zinc-50 hover:bg-zinc-900 hover:text-white border border-zinc-200 rounded text-zinc-600 transition-colors cursor-pointer"
@@ -7333,24 +7276,27 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
                                             <button
                                               type="button"
                                               onClick={() => {
-                                                const newVal = Math.max(0, qty - 1);
-                                                const currentMap = productFormData.stockMap || {};
-                                                const updated = {
-                                                  ...currentMap,
-                                                  [color]: {
-                                                    ...(currentMap[color] || {}),
-                                                    [size]: newVal
-                                                  }
-                                                };
-                                                let sum = 0;
-                                                Object.values(updated).forEach(sMap => {
-                                                  Object.values(sMap || {}).forEach(q => { sum += (Number(q) || 0); });
-                                                });
-                                                setProductFormData({
-                                                  ...productFormData,
-                                                  stockMap: updated,
-                                                  stock: sum,
-                                                  stockStatus: sum === 0 ? 'Out of Stock' : sum <= 10 ? 'Low Stock' : 'In Stock'
+                                                setProductFormData(prev => {
+                                                  const currentMap = prev.stockMap || {};
+                                                  const currentQty = currentMap[color]?.[size] ?? 0;
+                                                  const newVal = Math.max(0, currentQty - 1);
+                                                  const updated = {
+                                                    ...currentMap,
+                                                    [color]: {
+                                                      ...(currentMap[color] || {}),
+                                                      [size]: newVal
+                                                    }
+                                                  };
+                                                  let sum = 0;
+                                                  Object.values(updated).forEach(sMap => {
+                                                    Object.values(sMap || {}).forEach(q => { sum += (Number(q) || 0); });
+                                                  });
+                                                  return {
+                                                    ...prev,
+                                                    stockMap: updated,
+                                                    stock: sum,
+                                                    stockStatus: sum === 0 ? 'Out of Stock' : sum <= 10 ? 'Low Stock' : 'In Stock'
+                                                  };
                                                 });
                                               }}
                                               className="w-6 h-6 flex items-center justify-center bg-white border border-zinc-200 text-zinc-700 rounded-md text-xs font-bold hover:bg-zinc-100 select-none cursor-pointer"
@@ -7365,47 +7311,52 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
                                               value={qty}
                                               onChange={(e) => {
                                                 const val = Math.max(0, parseInt(e.target.value) || 0);
-                                                const currentMap = productFormData.stockMap || {};
-                                                const updated = {
-                                                  ...currentMap,
-                                                  [color]: {
-                                                    ...(currentMap[color] || {}),
-                                                    [size]: val
-                                                  }
-                                                };
-                                                let sum = 0;
-                                                Object.values(updated).forEach(sMap => {
-                                                  Object.values(sMap || {}).forEach(q => { sum += (Number(q) || 0); });
-                                                });
-                                                setProductFormData({
-                                                  ...productFormData,
-                                                  stockMap: updated,
-                                                  stock: sum,
-                                                  stockStatus: sum === 0 ? 'Out of Stock' : sum <= 10 ? 'Low Stock' : 'In Stock'
+                                                setProductFormData(prev => {
+                                                  const currentMap = prev.stockMap || {};
+                                                  const updated = {
+                                                    ...currentMap,
+                                                    [color]: {
+                                                      ...(currentMap[color] || {}),
+                                                      [size]: val
+                                                    }
+                                                  };
+                                                  let sum = 0;
+                                                  Object.values(updated).forEach(sMap => {
+                                                    Object.values(sMap || {}).forEach(q => { sum += (Number(q) || 0); });
+                                                  });
+                                                  return {
+                                                    ...prev,
+                                                    stockMap: updated,
+                                                    stock: sum,
+                                                    stockStatus: sum === 0 ? 'Out of Stock' : sum <= 10 ? 'Low Stock' : 'In Stock'
+                                                  };
                                                 });
                                               }}
                                             />
                                             <button
                                               type="button"
                                               onClick={() => {
-                                                const newVal = qty + 1;
-                                                const currentMap = productFormData.stockMap || {};
-                                                const updated = {
-                                                  ...currentMap,
-                                                  [color]: {
-                                                    ...(currentMap[color] || {}),
-                                                    [size]: newVal
-                                                  }
-                                                };
-                                                let sum = 0;
-                                                Object.values(updated).forEach(sMap => {
-                                                  Object.values(sMap || {}).forEach(q => { sum += (Number(q) || 0); });
-                                                });
-                                                setProductFormData({
-                                                  ...productFormData,
-                                                  stockMap: updated,
-                                                  stock: sum,
-                                                  stockStatus: sum === 0 ? 'Out of Stock' : sum <= 10 ? 'Low Stock' : 'In Stock'
+                                                setProductFormData(prev => {
+                                                  const currentMap = prev.stockMap || {};
+                                                  const currentQty = currentMap[color]?.[size] ?? 0;
+                                                  const newVal = currentQty + 1;
+                                                  const updated = {
+                                                    ...currentMap,
+                                                    [color]: {
+                                                      ...(currentMap[color] || {}),
+                                                      [size]: newVal
+                                                    }
+                                                  };
+                                                  let sum = 0;
+                                                  Object.values(updated).forEach(sMap => {
+                                                    Object.values(sMap || {}).forEach(q => { sum += (Number(q) || 0); });
+                                                  });
+                                                  return {
+                                                    ...prev,
+                                                    stockMap: updated,
+                                                    stock: sum,
+                                                    stockStatus: sum === 0 ? 'Out of Stock' : sum <= 10 ? 'Low Stock' : 'In Stock'
+                                                  };
                                                 });
                                               }}
                                               className="w-6 h-6 flex items-center justify-center bg-white border border-zinc-200 text-zinc-700 rounded-md text-xs font-bold hover:bg-zinc-100 select-none cursor-pointer"
@@ -8643,9 +8594,24 @@ export default function App() {
       }
 
       if (loadedProducts && loadedProducts.length > 0) {
-        setProducts(loadedProducts);
-        try { localStorage.setItem('elegan_products', JSON.stringify(loadedProducts)); } catch (e) {}
-        syncProductsToSupabase(loadedProducts);
+        let existingLocal: Product[] = [];
+        try {
+          const raw = localStorage.getItem('elegan_products');
+          if (raw) existingLocal = JSON.parse(raw);
+        } catch (e) {}
+
+        const mergedMap = new Map<string, Product>();
+        existingLocal.forEach(p => {
+          if (p && p.id) mergedMap.set(p.id.toString(), p);
+        });
+        loadedProducts.forEach(p => {
+          if (p && p.id) mergedMap.set(p.id.toString(), p);
+        });
+
+        const finalMerged = Array.from(mergedMap.values());
+        setProducts(finalMerged);
+        try { localStorage.setItem('elegan_products', JSON.stringify(finalMerged)); } catch (e) {}
+        syncProductsToSupabase(finalMerged);
       } else if (!saved) {
         setProducts(defaultProducts);
       }
@@ -9300,21 +9266,28 @@ export default function App() {
           </section>
         )}
 
-        {currentPage === 'product-details' && selectedProduct && (
-          <ProductDetails 
-            product={selectedProduct} 
-            onAddToCart={addToCart} 
-            onBack={() => handleNavigate('shop')} 
-            onBuyNow={handleBuyNow}
-            user={user}
-            showToast={showToast}
-            onNavigate={handleNavigate}
-            onCategoryClick={(category) => {
-              setSelectedCategory(category);
-              handleNavigate('shop');
-            }}
-          />
-        )}
+        {currentPage === 'product-details' && selectedProduct && (() => {
+          const currentProduct = products.find(p => p.id.toString() === selectedProduct.id.toString()) || selectedProduct;
+          return (
+            <ProductDetails 
+              product={currentProduct} 
+              products={products}
+              onAddToCart={addToCart} 
+              onBack={() => handleNavigate('shop')} 
+              onBuyNow={handleBuyNow}
+              user={user}
+              showToast={showToast}
+              onNavigate={handleNavigate}
+              onCategoryClick={(category) => {
+                setSelectedCategory(category);
+                handleNavigate('shop');
+              }}
+              onSelectProduct={(p) => setSelectedProduct(p)}
+              userWishlist={user?.wishlist}
+              onToggleWishlist={handleToggleWishlist}
+            />
+          );
+        })()}
 
         {currentPage === 'checkout' && (
           <CheckoutPage 
