@@ -1394,22 +1394,34 @@ const CustomerReviewsSection = ({ showToast }: { showToast?: (msg: string, type?
       try {
         const snap = await getDocs(collection(db, 'customer_reviews_v2'));
         if (!snap.empty) {
-          const items: CustomerReviewItem[] = [];
+          const fetchedItems: CustomerReviewItem[] = [];
           snap.forEach(docSnap => {
             const data = docSnap.data() as Record<string, any>;
-            items.push({
+            fetchedItems.push({
               id: docSnap.id,
               name: data.name || '',
-              avatar: data.avatar || '',
+              avatar: data.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400&h=400',
               comment: data.comment || '',
               rating: Number(data.rating) || 5,
               date: data.date || '',
               product: data.product || ''
             });
           });
-          if (items.length > 0) {
-            setReviewsList(items);
-            localStorage.setItem('elegan_customer_reviews_v2', JSON.stringify(items));
+          if (fetchedItems.length > 0) {
+            setReviewsList(prev => {
+              const map = new Map<string, CustomerReviewItem>();
+              fetchedItems.forEach(item => map.set(String(item.id), item));
+              prev.forEach(item => {
+                if (!map.has(String(item.id))) {
+                  map.set(String(item.id), item);
+                }
+              });
+              const merged = Array.from(map.values());
+              try {
+                localStorage.setItem('elegan_customer_reviews_v2', JSON.stringify(merged));
+              } catch (e) {}
+              return merged;
+            });
           }
         }
       } catch (err) {
