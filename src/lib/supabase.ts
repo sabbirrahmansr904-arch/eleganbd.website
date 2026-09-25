@@ -28,7 +28,10 @@ export async function fetchProductsFromSupabase(): Promise<any[] | null> {
         originalPrice: Number(item.original_price) || undefined,
         image: item.image_url || item.image || '',
         images: item.image_url ? [item.image_url] : (item.images || []),
-        stockStatus: item.stock_status || 'In Stock'
+        stockStatus: item.stock_status || 'In Stock',
+        description: item.description || '',
+        fabric: item.fabric || '',
+        fit: item.fit || ''
       }));
     }
   } catch (err) {
@@ -42,6 +45,9 @@ export async function saveProductToSupabase(product: any) {
     const payload: any = {
       id: product.id?.toString(),
       name: product.name,
+      description: product.description || '',
+      fabric: product.fabric || '',
+      fit: product.fit || '',
       category: product.category || 'General',
       price: Number(product.price) || 0,
       original_price: Number(product.originalPrice || product.original_price) || null,
@@ -227,6 +233,9 @@ export async function syncProductsToSupabase(products: any[]) {
     const payloads = products.map(p => ({
       id: p.id?.toString(),
       name: p.name,
+      description: p.description || '',
+      fabric: p.fabric || '',
+      fit: p.fit || '',
       category: p.category || 'General',
       price: Number(p.price) || 0,
       original_price: Number(p.originalPrice || p.original_price) || null,

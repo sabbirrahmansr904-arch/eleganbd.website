@@ -51,7 +51,10 @@ export interface Order {
 export interface Banner {
   id: string | number;
   image: string; // Desktop banner (1920 × 700 px)
-  mobile_image?: string; // Mobile banner (800 × 900 px)
+  mobile_image?: string; // Mobile banner
+  mobile_ratio?: 'auto' | '16/9' | '2/1' | '4/3' | '1/1' | '4/5' | '8/9';
+  mobile_fit?: 'contain' | 'cover';
+  mobile_height?: number;
   title?: string;
   subtitle?: string;
   buttonText?: string;

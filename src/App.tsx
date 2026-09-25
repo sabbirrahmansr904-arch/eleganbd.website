@@ -58,7 +58,8 @@ import {
   Boxes,
   DollarSign,
   ArrowUpRight,
-  Edit2
+  Edit2,
+  Smartphone
 } from 'lucide-react';
 import { 
   supabase, 
@@ -87,6 +88,7 @@ import {
 import { GoogleGenAI } from "@google/genai";
 import { Product, CartItem, User, Order, Banner, Coupon, Review } from './types';
 import initialProductsData from './defaultProducts.json';
+import { trackPageView, trackViewContent, trackAddToCart, trackInitiateCheckout, trackPurchase, FB_PIXEL_ID } from './utils/pixel';
 import { db, auth, storage } from './firebase';
 import { collection, getDocs as _getDocs, getDoc as _getDoc, doc, addDoc as _addDoc, updateDoc as _updateDoc, deleteDoc as _deleteDoc, setDoc as _setDoc, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
@@ -1381,7 +1383,15 @@ const Hero = ({ onShopNow, videoUrl, imageUrl }: { onShopNow: () => void, videoU
   );
 };
 
-const BannerCarousel = ({ banners }: { banners: Banner[] }) => {
+const BannerCarousel = ({ 
+  banners, 
+  onNavigate,
+  mobileConfig 
+}: { 
+  banners: Banner[], 
+  onNavigate?: (page: string) => void,
+  mobileConfig?: { ratio?: 'auto' | '16/9' | '2/1' | '4/3' | '1/1' | '4/5' | '8/9', fit?: 'contain' | 'cover', height?: number }
+}) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
@@ -1397,31 +1407,65 @@ const BannerCarousel = ({ banners }: { banners: Banner[] }) => {
   const next = () => setCurrentIndex((prev) => (prev + 1) % banners.length);
   const prev = () => setCurrentIndex((prev) => (prev - 1 + banners.length) % banners.length);
 
+  const currentBanner = banners[currentIndex] || banners[0];
+  const effectiveRatio = currentBanner.mobile_ratio || mobileConfig?.ratio || '16/9';
+  const effectiveFit = currentBanner.mobile_fit || mobileConfig?.fit || 'cover';
+  const effectiveHeight = currentBanner.mobile_height || mobileConfig?.height;
+
+  const getMobileClasses = () => {
+    const fitClass = effectiveFit === 'contain' ? 'object-contain' : 'object-cover';
+    if (effectiveRatio === '16/9') {
+      return `w-full aspect-[16/9] ${fitClass} md:aspect-[1920/700] md:object-cover block`;
+    }
+    if (effectiveRatio === '2/1') {
+      return `w-full aspect-[2/1] ${fitClass} md:aspect-[1920/700] md:object-cover block`;
+    }
+    if (effectiveRatio === '4/3') {
+      return `w-full aspect-[4/3] ${fitClass} md:aspect-[1920/700] md:object-cover block`;
+    }
+    if (effectiveRatio === '1/1') {
+      return `w-full aspect-square ${fitClass} md:aspect-[1920/700] md:object-cover block`;
+    }
+    if (effectiveRatio === '4/5') {
+      return `w-full aspect-[4/5] ${fitClass} md:aspect-[1920/700] md:object-cover block`;
+    }
+    if (effectiveRatio === '8/9') {
+      return `w-full aspect-[800/900] ${fitClass} md:aspect-[1920/700] md:object-cover block`;
+    }
+    // 'auto': Show original picture with natural height, capped at a balanced max height on mobile
+    return `w-full h-auto max-h-[360px] sm:max-h-[440px] ${fitClass} md:aspect-[1920/700] md:object-cover md:max-h-none block`;
+  };
+
   return (
-    <div className="relative w-full bg-zinc-100">
+    <div 
+      className="relative w-full bg-zinc-950 overflow-hidden flex items-center justify-center"
+      style={effectiveHeight ? { maxHeight: `${effectiveHeight}px` } : undefined}
+    >
       <AnimatePresence mode="wait">
         <motion.div
           key={currentIndex}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.7 }}
-          className="w-full"
+          transition={{ duration: 0.6 }}
+          className="w-full flex items-center justify-center relative select-none"
         >
-          {(banners[currentIndex].title || banners[currentIndex].subtitle) && (
-            <div className="absolute inset-0 bg-black/30 z-10" />
+          {(currentBanner.title || currentBanner.subtitle) && (
+            <div className="absolute inset-0 bg-black/35 z-10 pointer-events-none" />
           )}
           <picture className="w-full block">
-            {banners[currentIndex].mobile_image && (
+            {currentBanner.mobile_image && (
               <source
                 media="(max-width: 767px)"
-                srcSet={banners[currentIndex].mobile_image}
+                srcSet={currentBanner.mobile_image}
               />
             )}
             <img
-              src={banners[currentIndex].image || banners[currentIndex].mobile_image || '/banners/hero_desktop.jpg'}
-              alt={banners[currentIndex].title || 'Hero Banner'}
-              className="w-full aspect-[800/900] md:aspect-[1920/700] object-cover block"
+              src={currentBanner.image || currentBanner.mobile_image || '/banners/hero_desktop.jpg'}
+              alt={currentBanner.title || 'Hero Banner'}
+              className={getMobileClasses()}
+              loading="eager"
+              decoding="async"
               referrerPolicy="no-referrer"
               onError={(e) => {
                 const target = e.currentTarget as HTMLImageElement;
@@ -1431,26 +1475,26 @@ const BannerCarousel = ({ banners }: { banners: Banner[] }) => {
               }}
             />
           </picture>
-          {(banners[currentIndex].title || banners[currentIndex].subtitle) && (
-            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center px-4">
-              {banners[currentIndex].title && (
+          {(currentBanner.title || currentBanner.subtitle) && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center px-4 pointer-events-none">
+              {currentBanner.title && (
                 <motion.h2
                   initial={{ y: 20, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
                   transition={{ delay: 0.2 }}
-                  className="text-white text-3xl md:text-6xl font-serif font-bold mb-4 tracking-tight"
+                  className="text-white text-2xl sm:text-3xl md:text-6xl font-serif font-bold mb-2 sm:mb-4 tracking-tight drop-shadow-sm"
                 >
-                  {banners[currentIndex].title}
+                  {currentBanner.title}
                 </motion.h2>
               )}
-              {banners[currentIndex].subtitle && (
+              {currentBanner.subtitle && (
                 <motion.p
                   initial={{ y: 20, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
                   transition={{ delay: 0.3 }}
-                  className="text-white/90 text-sm md:text-xl max-w-2xl font-light"
+                  className="text-white/95 text-xs sm:text-sm md:text-xl max-w-2xl font-light drop-shadow-xs"
                 >
-                  {banners[currentIndex].subtitle}
+                  {currentBanner.subtitle}
                 </motion.p>
               )}
             </div>
@@ -1462,17 +1506,17 @@ const BannerCarousel = ({ banners }: { banners: Banner[] }) => {
         <>
           <button
             onClick={prev}
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-30 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-colors"
+            className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 z-30 p-1.5 sm:p-2 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-md transition-colors"
           >
-            <ChevronLeft size={24} />
+            <ChevronLeft size={20} />
           </button>
           <button
             onClick={next}
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-30 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full backdrop-blur-md transition-colors"
+            className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 z-30 p-1.5 sm:p-2 bg-black/40 hover:bg-black/60 text-white rounded-full backdrop-blur-md transition-colors"
           >
-            <ChevronRight size={24} />
+            <ChevronRight size={20} />
           </button>
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 flex gap-2">
+          <div className="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-30 flex gap-2">
             {banners.map((_, i) => (
               <button
                 key={i}
@@ -1515,7 +1559,7 @@ const MiddleBanner = ({ banner, onNavigate }: { banner?: Banner, onNavigate: (pa
         <img
           src={imageSrc}
           alt={currentBanner.title || 'Special Collection Banner'}
-          className="w-full aspect-[800/900] md:aspect-[1920/700] object-cover block transition-transform duration-700 group-hover:scale-105"
+          className="w-full aspect-[16/9] sm:aspect-[2/1] md:aspect-[1920/700] object-cover block transition-transform duration-700 group-hover:scale-105"
           referrerPolicy="no-referrer"
         />
       </picture>
@@ -1589,9 +1633,9 @@ const TrustFeatureBadges = () => {
   ];
 
   return (
-    <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-5 sm:-mt-8 md:-mt-10 mb-8 sm:mb-12 relative z-20">
-      <div className="bg-white rounded-2xl sm:rounded-3xl border border-zinc-200/90 shadow-md p-5 sm:p-6 md:p-8">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6 lg:gap-8 items-center">
+    <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 sm:mt-6 md:mt-8 mb-6 sm:mb-10 relative z-20">
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-zinc-200/90 shadow-sm p-4 sm:p-6 md:p-7">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 items-center">
           {items.map((item, idx) => (
             <div key={idx} className="flex items-center gap-3.5 sm:gap-4">
               <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-2xl bg-[#2563eb] flex items-center justify-center shrink-0 shadow-xs">
@@ -2456,19 +2500,11 @@ const ProductDetails = ({ product, onAddToCart, onBack, onBuyNow, user, showToas
             </div>
           </div>
 
-          <div className="space-y-6 mb-10">
-            <div>
-              <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1">Fabric</h4>
-              <p className="text-zinc-900 font-medium">{product.fabric}</p>
-            </div>
-            <div>
-              <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1">Fit Type</h4>
-              <p className="text-zinc-900 font-medium">{product.fit}</p>
-            </div>
-            <div>
-              <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1">Description</h4>
-              <p className="text-zinc-600 leading-relaxed whitespace-pre-line">{product.description}</p>
-            </div>
+          <div className="mb-10">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-2">Description</h4>
+            <p className="text-zinc-600 leading-relaxed whitespace-pre-line text-sm">
+              {product.description || 'Premium quality formal wear tailored for comfort, style, and everyday elegance.'}
+            </p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 mt-auto">
@@ -2757,6 +2793,12 @@ const CheckoutPage = ({
   const shipping = formData.location === 'inside' ? 70 : 130;
   const total = subtotal + shipping - discount;
 
+  useEffect(() => {
+    if (items && items.length > 0) {
+      trackInitiateCheckout(items, total);
+    }
+  }, []);
+
   const handleApplyCoupon = async () => {
     if (!couponCode) return;
     setIsValidatingCoupon(true);
@@ -2852,6 +2894,13 @@ const CheckoutPage = ({
       };
       const docRef = await addDoc(collection(db, 'orders'), orderData);
       
+      // Facebook Pixel: Track Purchase
+      trackPurchase({
+        orderId: docRef.id,
+        total: total,
+        items: items
+      });
+
       // Save order to Supabase
       await saveOrderToSupabase({ ...orderData, order_id: docRef.id, id: docRef.id });
 
@@ -3134,16 +3183,661 @@ const CheckoutPage = ({
       id: 'default_hero_banner',
       image: '/banners/hero_desktop.jpg',
       mobile_image: '/banners/hero_mobile.jpg',
+      mobile_ratio: '16/9',
+      mobile_fit: 'cover',
       title: '',
       subtitle: '',
-      buttonText: 'SHOP NOW!',
+      buttonText: '',
       link: '/shop'
     }
   ];
 
-const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshPromoImage, onRefreshHeroVideo, onRefreshHeroImage, onRefreshCategories, onRefreshMiddleBanner, showToast }: { onBack: () => void, onRefreshProducts: () => void, onRefreshBanners: () => void, onRefreshPromoImage: () => void, onRefreshHeroVideo: () => void, onRefreshHeroImage: () => void, onRefreshCategories?: () => void, onRefreshMiddleBanner?: () => void, showToast: (msg: string, type?: 'success' | 'error' | 'info') => void }) => {
+const MobileHeroBannerManager = ({
+  banners,
+  mobileHeroBannerForm,
+  setMobileHeroBannerForm,
+  handleFileUpload,
+  handleSaveMobileHeroBanner,
+  handleApplyMobileRatioToAll,
+  globalMobileConfig,
+  onUpdateGlobalMobileConfig,
+  isMobileHeroSaving,
+  isUploading,
+  deleteBanner,
+  onOpenDesktopBanners,
+  showToast
+}: {
+  banners: Banner[],
+  mobileHeroBannerForm: Banner,
+  setMobileHeroBannerForm: React.Dispatch<React.SetStateAction<Banner>>,
+  handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>, type: any) => Promise<void>,
+  handleSaveMobileHeroBanner: (e?: React.FormEvent) => Promise<void>,
+  handleApplyMobileRatioToAll?: (ratio: 'auto' | '16/9' | '2/1' | '4/3' | '1/1' | '4/5' | '8/9', fit: 'contain' | 'cover') => Promise<void>,
+  globalMobileConfig?: { ratio?: 'auto' | '16/9' | '2/1' | '4/3' | '1/1' | '4/5' | '8/9', fit?: 'contain' | 'cover', height?: number },
+  onUpdateGlobalMobileConfig?: (config: { ratio: any, fit: any, height?: number }) => Promise<void>,
+  isMobileHeroSaving: boolean,
+  isUploading: boolean,
+  deleteBanner: (id: string | number) => Promise<void>,
+  onOpenDesktopBanners: () => void,
+  showToast: (msg: string, type?: 'success' | 'error' | 'info') => void
+}) => {
+  const currentRatio = mobileHeroBannerForm.mobile_ratio || '16/9';
+  const currentFit = mobileHeroBannerForm.mobile_fit || 'cover';
+
+  const ratioOptions: { id: 'auto' | '16/9' | '2/1' | '4/3' | '1/1' | '4/5' | '8/9', label: string, desc: string, icon: string }[] = [
+    { id: '16/9', label: '16:9 স্ট্যান্ডার্ড', desc: 'মোবাইল ই-কমার্সের সেরা সাইজ (~২২০px)', icon: '📱' },
+    { id: '2/1', label: '2:1 স্লিম সাইজ', desc: 'কমপ্যাক্ট স্লিম ব্যানার (~১৯৫px), প্রোডাক্ট দ্রুত দৃশ্যমান', icon: '📐' },
+    { id: '4/3', label: '4:3 ব্যালান্সড', desc: 'মাঝারি মাপ (~২৯০px), ক্লাসিক ক্যাটালগ ভিউ', icon: '🖼️' },
+    { id: '1/1', label: '1:1 স্কয়ার', desc: 'বর্গাকার মাপ (1080×1080)', icon: '⏹️' },
+    { id: 'auto', label: 'অরিজিনাল (নো ক্রপ)', desc: 'ছবির আসল অনুপাত ১০০% স্পষ্ট, কোনো অংশ কাটবে না', icon: '🌟' },
+    { id: '4/5', label: '4:5 পোর্ট্রেট', desc: 'লম্বা ফ্যাশন পোস্টার সাইজ (~৪৪০px)', icon: '📜' }
+  ];
+
+  const getMockupContainerClass = () => {
+    if (currentRatio === '16/9') return 'w-full aspect-[16/9]';
+    if (currentRatio === '2/1') return 'w-full aspect-[2/1]';
+    if (currentRatio === '4/3') return 'w-full aspect-[4/3]';
+    if (currentRatio === '1/1') return 'w-full aspect-square';
+    if (currentRatio === '4/5') return 'w-full aspect-[4/5]';
+    if (currentRatio === '8/9') return 'w-full aspect-[800/900]';
+    // 'auto': natural height preview
+    return 'w-full h-auto max-h-[220px] min-h-[110px]';
+  };
+
+  return (
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 sm:p-8 rounded-2xl border border-zinc-200/80 shadow-xs">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-800 border border-blue-200/80 rounded-full text-xs font-bold uppercase tracking-wider mb-2.5">
+            <Smartphone size={14} className="text-blue-600" />
+            <span>Mobile Screen Dedicated Section</span>
+          </div>
+          <h3 className="text-2xl font-serif font-bold text-zinc-900">
+            Mobile Hero Banner (মোবাইল হিরো ব্যানার সাইজ ও ডিসপ্লে)
+          </h3>
+          <p className="text-xs text-zinc-500 mt-1 max-w-xl leading-relaxed">
+            স্মার্টফোনে ব্যানার যাতে কোনোভাবেই কাটা না পড়ে বা অতিরিক্ত লম্বা না দেখায়, সেজন্য নিচের সাইজ অপশন সিলেক্ট করুন। <strong>"অরিজিনাল (নো ক্রপ)"</strong> সিলেক্ট করলে ছবির ১০০% অংশ সম্পূর্ণ নিখুঁতভাবে প্রদর্শিত হবে।
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2.5">
+          <button 
+            type="button"
+            onClick={() => {
+              setMobileHeroBannerForm({
+                id: '',
+                image: '',
+                mobile_image: '',
+                mobile_ratio: 'auto',
+                mobile_fit: 'contain',
+                title: '',
+                subtitle: '',
+                buttonText: '',
+                link: 'shop'
+              });
+              showToast('Ready to configure new mobile banner', 'info');
+            }}
+            className="px-4 py-2 border border-zinc-300 text-zinc-700 hover:bg-zinc-50 text-xs font-bold uppercase tracking-wider rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
+          >
+            <Plus size={15} /> New Mobile Banner
+          </button>
+          <button 
+            type="button"
+            onClick={onOpenDesktopBanners}
+            className="px-4 py-2 bg-zinc-900 text-white hover:bg-zinc-800 text-xs font-bold uppercase tracking-wider rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
+          >
+            <Settings size={14} /> Desktop Banners (1920×700)
+          </button>
+        </div>
+      </div>
+
+      {/* 1-Click Batch Fix for All Active Banners */}
+      <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border border-amber-200 p-5 rounded-2xl shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
+              <Sparkles size={17} className="text-amber-600" />
+              <span>১-ক্লিকে সব ব্যানারের মোবাইল সাইজ ঠিক করুন (Quick Apply To All)</span>
+            </div>
+            <p className="text-xs text-amber-800/80 mt-0.5">
+              যদি আপনার কোনো ব্যানারের সাইজ মোবাইলে ঠিকমতো না দেখায়, তবে নিচের বাটনে ক্লিক করে একসাথেই সব ব্যানারের সাইজ ফিক্স করে ফেলুন:
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => handleApplyMobileRatioToAll && handleApplyMobileRatioToAll('16/9', 'cover')}
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              📱 16:9 স্ট্যান্ডার্ড (~২২০px)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleApplyMobileRatioToAll && handleApplyMobileRatioToAll('2/1', 'cover')}
+              className="px-3.5 py-2 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold uppercase tracking-wider shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              📐 2:1 স্লিম (~১৯৫px)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleApplyMobileRatioToAll && handleApplyMobileRatioToAll('auto', 'contain')}
+              className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              🌟 নো ক্রপ (১০০% ছবি)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleApplyMobileRatioToAll && handleApplyMobileRatioToAll('4/3', 'cover')}
+              className="px-3.5 py-2 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold uppercase tracking-wider shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              🖼️ 4:3 ব্যালান্সড (~২৯০px)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleApplyMobileRatioToAll && handleApplyMobileRatioToAll('1/1', 'cover')}
+              className="px-3.5 py-2 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold uppercase tracking-wider shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              ⏹️ 1:1 স্কয়ার (~৩৬০px)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Workspace: Form & Phone Mockup */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Form Controls (7 cols) */}
+        <div className="lg:col-span-7 bg-white p-6 sm:p-8 rounded-2xl border border-zinc-200/80 shadow-xs">
+          <h4 className="text-lg font-serif font-bold text-zinc-900 mb-1">
+            {mobileHeroBannerForm.id ? 'Edit Mobile Hero Banner' : 'Configure Mobile Hero Banner'}
+          </h4>
+          <p className="text-xs text-zinc-500 mb-6">
+            ব্যানারের ছবি আপলোড করুন এবং নিচে থেকে পছন্দের সাইজ ও ফিটিং সিলেক্ট করুন।
+          </p>
+
+          <form onSubmit={handleSaveMobileHeroBanner} className="space-y-6">
+            {/* Upload Box */}
+            <div className="p-5 bg-zinc-50 rounded-2xl border-2 border-dashed border-zinc-300 hover:border-zinc-400 transition-colors">
+              <div className="flex flex-col items-center justify-center text-center">
+                <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
+                  <Smartphone size={24} />
+                </div>
+                <p className="text-sm font-bold text-zinc-900 mb-0.5">
+                  Upload Mobile Banner Image
+                </p>
+                <p className="text-xs text-zinc-500 mb-4">
+                  যেকোনো ছবির ফাইল (JPEG, PNG, WebP) নির্বাচন করুন
+                </p>
+
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    id="mobile-hero-file-upload" 
+                    className="hidden" 
+                    onChange={(e) => handleFileUpload(e, 'mobile_hero')} 
+                  />
+                  <label 
+                    htmlFor="mobile-hero-file-upload" 
+                    className="btn-primary py-2.5 px-5 text-xs flex items-center gap-2 cursor-pointer shadow-xs"
+                  >
+                    <Upload size={14} />
+                    <span>{isUploading ? 'Compressing & Uploading...' : 'Choose Picture from Device'}</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Direct URL input */}
+              <div className="mt-4 pt-4 border-t border-zinc-200">
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
+                  Or Direct Image URL (অথবা ছবির লিংক)
+                </label>
+                <input 
+                  type="text"
+                  value={mobileHeroBannerForm.mobile_image || ''}
+                  onChange={(e) => setMobileHeroBannerForm({ ...mobileHeroBannerForm, mobile_image: e.target.value, image: mobileHeroBannerForm.image || e.target.value })}
+                  placeholder="https://... (Direct image URL)"
+                  className="w-full bg-white text-zinc-900 text-sm font-medium border border-zinc-300 focus:border-zinc-900 rounded-xl py-2.5 px-3.5 outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Mobile Banner Aspect Ratio Selection */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-800">
+                  Mobile Banner Size & Ratio (মোবাইল স্ক্রিনে ব্যানার সাইজ)
+                </label>
+                <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                  Active: {currentRatio.toUpperCase()}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {ratioOptions.map((opt) => {
+                  const isSelected = currentRatio === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setMobileHeroBannerForm(prev => ({
+                        ...prev,
+                        mobile_ratio: opt.id,
+                        mobile_fit: opt.id === 'auto' ? 'contain' : prev.mobile_fit || 'cover'
+                      }))}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                        isSelected 
+                          ? 'border-blue-600 bg-blue-50/70 shadow-xs ring-1 ring-blue-600' 
+                          : 'border-zinc-200 hover:border-zinc-300 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-bold text-xs text-zinc-900 mb-0.5">
+                        <span>{opt.icon}</span>
+                        <span>{opt.label}</span>
+                      </div>
+                      <p className="text-[10px] text-zinc-500 leading-tight">
+                        {opt.desc}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Image Fitting Mode */}
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-zinc-800 mb-2">
+                Image Fit Mode (ছবি প্রদর্শনের স্টাইল)
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setMobileHeroBannerForm(prev => ({ ...prev, mobile_fit: 'contain' }))}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    currentFit === 'contain'
+                      ? 'border-blue-600 bg-blue-50/70 shadow-xs ring-1 ring-blue-600'
+                      : 'border-zinc-200 hover:border-zinc-300 bg-white'
+                  }`}
+                >
+                  <p className="font-bold text-xs text-zinc-900 mb-0.5">
+                    🛡️ No Crop / Fit (সম্পূর্ণ ছবি অক্ষত)
+                  </p>
+                  <p className="text-[10px] text-zinc-500 leading-tight">
+                    ছবির কোনো অংশ কাটা পড়বে না, সম্পূর্ণ ব্যানার স্পষ্টভাবে দেখা যাবে।
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMobileHeroBannerForm(prev => ({ ...prev, mobile_fit: 'cover' }))}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    currentFit === 'cover'
+                      ? 'border-blue-600 bg-blue-50/70 shadow-xs ring-1 ring-blue-600'
+                      : 'border-zinc-200 hover:border-zinc-300 bg-white'
+                  }`}
+                >
+                  <p className="font-bold text-xs text-zinc-900 mb-0.5">
+                    📐 Fill Screen / Cover (বক্স ফিল করবে)
+                  </p>
+                  <p className="text-[10px] text-zinc-500 leading-tight">
+                    নির্ধারিত মাপের পুরো ফ্রেমটি পূর্ণ করে দেখাবে।
+                  </p>
+                </button>
+              </div>
+            </div>
+
+            {/* Custom Pixel Height (Optional) */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-800">
+                  Fixed Mobile Height (ঐচ্ছিক ফিক্সড উচ্চতা)
+                </label>
+                <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded">
+                  {mobileHeroBannerForm.mobile_height ? `${mobileHeroBannerForm.mobile_height}px` : 'Auto Responsive'}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                {[
+                  { label: 'Auto', val: undefined },
+                  { label: '200 px', val: 200 },
+                  { label: '240 px', val: 240 },
+                  { label: '280 px', val: 280 },
+                  { label: '320 px', val: 320 }
+                ].map((hOption) => {
+                  const isActive = mobileHeroBannerForm.mobile_height === hOption.val;
+                  return (
+                    <button
+                      key={hOption.label}
+                      type="button"
+                      onClick={() => setMobileHeroBannerForm(prev => ({ ...prev, mobile_height: hOption.val }))}
+                      className={`py-2 px-3 rounded-xl border text-center text-xs font-bold transition-all cursor-pointer ${
+                        isActive
+                          ? 'border-blue-600 bg-blue-50 text-blue-700 ring-1 ring-blue-600'
+                          : 'border-zinc-200 hover:border-zinc-300 bg-white text-zinc-700'
+                      }`}
+                    >
+                      {hOption.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-zinc-400 mt-1">
+                মোবাইলে ব্যানারের সর্বোচ্চ উচ্চতা পিক্সেল হিসেবে নিয়ন্ত্রণ করতে পারেন।
+              </p>
+            </div>
+
+            {/* Banner Text Customization */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700 mb-1.5">
+                  Headline Title (ঐচ্ছিক)
+                </label>
+                <input 
+                  type="text"
+                  value={mobileHeroBannerForm.title || ''}
+                  onChange={(e) => setMobileHeroBannerForm({ ...mobileHeroBannerForm, title: e.target.value })}
+                  placeholder="E.g. EID SPECIAL COLLECTION"
+                  className="w-full bg-zinc-50 hover:bg-zinc-100/70 focus:bg-white text-zinc-900 text-sm border border-zinc-200 focus:border-zinc-900 rounded-xl py-2.5 px-3.5 outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700 mb-1.5">
+                  Subtitle (ঐচ্ছিক)
+                </label>
+                <input 
+                  type="text"
+                  value={mobileHeroBannerForm.subtitle || ''}
+                  onChange={(e) => setMobileHeroBannerForm({ ...mobileHeroBannerForm, subtitle: e.target.value })}
+                  placeholder="E.g. Flat 20% Off For Today"
+                  className="w-full bg-zinc-50 hover:bg-zinc-100/70 focus:bg-white text-zinc-900 text-sm border border-zinc-200 focus:border-zinc-900 rounded-xl py-2.5 px-3.5 outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700 mb-1.5">
+                  Button Text (বাটন লেখা)
+                </label>
+                <input 
+                  type="text"
+                  value={mobileHeroBannerForm.buttonText || ''}
+                  onChange={(e) => setMobileHeroBannerForm({ ...mobileHeroBannerForm, buttonText: e.target.value })}
+                  placeholder="SHOP NOW"
+                  className="w-full bg-zinc-50 hover:bg-zinc-100/70 focus:bg-white text-zinc-900 text-sm border border-zinc-200 focus:border-zinc-900 rounded-xl py-2.5 px-3.5 outline-none transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700 mb-1.5">
+                  Target Link / Page (ক্লিক করলে কোথায় যাবে)
+                </label>
+                <input 
+                  type="text"
+                  value={mobileHeroBannerForm.link || ''}
+                  onChange={(e) => setMobileHeroBannerForm({ ...mobileHeroBannerForm, link: e.target.value })}
+                  placeholder="shop"
+                  className="w-full bg-zinc-50 hover:bg-zinc-100/70 focus:bg-white text-zinc-900 text-sm border border-zinc-200 focus:border-zinc-900 rounded-xl py-2.5 px-3.5 outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Save Button */}
+            <div className="pt-2 flex flex-col sm:flex-row gap-3">
+              <button 
+                type="submit"
+                disabled={isMobileHeroSaving || isUploading}
+                className="flex-1 btn-primary py-3.5 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-60"
+              >
+                {isMobileHeroSaving ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Saving Mobile Banner...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save size={16} />
+                    <span>Save Mobile Hero Banner (সংরক্ষণ করুন)</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* Live Smartphone Mockup (5 cols) */}
+        <div className="lg:col-span-5 flex flex-col items-center">
+          <div className="text-center mb-3">
+            <span className="text-xs font-bold uppercase tracking-widest text-zinc-700">
+              Live Smartphone Screen Preview
+            </span>
+            <p className="text-[11px] text-zinc-400">
+              সাইজ: <span className="font-bold text-blue-600">{currentRatio.toUpperCase()}</span> | ফিটিং: <span className="font-bold text-blue-600">{currentFit}</span>
+            </p>
+          </div>
+
+          {/* Smartphone Mockup */}
+          <div className="relative w-[280px] sm:w-[310px] aspect-[9/18.5] bg-zinc-950 rounded-[48px] p-3 shadow-2xl ring-1 ring-zinc-800 border-4 border-zinc-700 overflow-hidden flex flex-col">
+            {/* Notch / Dynamic Island */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 h-5 w-24 bg-black rounded-full z-40 flex items-center justify-end pr-2 shadow-xs">
+              <div className="w-2.5 h-2.5 bg-zinc-900 rounded-full border border-zinc-800" />
+            </div>
+
+            {/* Status Bar */}
+            <div className="flex justify-between items-center px-4 pt-1 pb-1.5 text-[10px] text-white font-medium z-30 select-none">
+              <span>9:41</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px]">5G</span>
+                <div className="w-4 h-2 border border-white rounded-xs p-0.5 flex items-center">
+                  <div className="w-2.5 h-full bg-white rounded-2xs" />
+                </div>
+              </div>
+            </div>
+
+            {/* Mini Storefront Header */}
+            <div className="bg-zinc-950/95 text-white px-3 py-2 flex items-center justify-between text-xs z-30 border-b border-white/10 shrink-0">
+              <span className="font-serif font-bold text-xs tracking-wider text-amber-300">ELEGAN BD</span>
+              <div className="flex items-center gap-2">
+                <Search size={13} className="text-zinc-400" />
+                <ShoppingBag size={13} className="text-zinc-400" />
+              </div>
+            </div>
+
+            {/* Screen View Area */}
+            <div className="relative flex-1 bg-zinc-900 rounded-[28px] overflow-hidden flex flex-col">
+              {/* Live Hero Banner inside phone with dynamic ratio & fit */}
+              <div 
+                className={`relative ${getMockupContainerClass()} overflow-hidden bg-zinc-950 shrink-0 flex items-center justify-center`}
+                style={mobileHeroBannerForm.mobile_height ? { maxHeight: `${mobileHeroBannerForm.mobile_height}px` } : undefined}
+              >
+                <img 
+                  src={mobileHeroBannerForm.mobile_image || mobileHeroBannerForm.image || '/banners/hero_desktop.jpg'} 
+                  alt="Mobile Banner Preview" 
+                  className={`w-full h-full block ${currentFit === 'contain' ? 'object-contain' : 'object-cover'}`}
+                  onError={(e) => {
+                    const target = e.currentTarget as HTMLImageElement;
+                    if (!target.src.includes('/banners/hero_desktop.jpg')) {
+                      target.src = '/banners/hero_desktop.jpg';
+                    }
+                  }}
+                />
+                {(mobileHeroBannerForm.title || mobileHeroBannerForm.subtitle) && (
+                  <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center p-3">
+                    {mobileHeroBannerForm.title && (
+                      <h5 className="text-white text-xs sm:text-sm font-serif font-bold mb-1 leading-tight drop-shadow-sm">
+                        {mobileHeroBannerForm.title}
+                      </h5>
+                    )}
+                    {mobileHeroBannerForm.subtitle && (
+                      <p className="text-white/90 text-[10px] max-w-[200px] mb-2 leading-tight">
+                        {mobileHeroBannerForm.subtitle}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Mock Storefront Body to show context */}
+              <div className="p-3 bg-zinc-50 flex-1 overflow-hidden">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-800">Featured Pant</span>
+                  <span className="text-[9px] text-[#cfa83b] font-bold">Shop</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-white p-1.5 rounded-lg border border-zinc-200/70 shadow-2xs">
+                    <div className="aspect-square bg-zinc-100 rounded mb-1 overflow-hidden">
+                      <img src="/products/1Ek7JsTySRxXzeM6VKL0.jpg" alt="Pant" className="w-full h-full object-cover" />
+                    </div>
+                    <div className="h-2 w-14 bg-zinc-300 rounded mb-1" />
+                    <div className="h-2 w-8 bg-zinc-400 rounded" />
+                  </div>
+                  <div className="bg-white p-1.5 rounded-lg border border-zinc-200/70 shadow-2xs">
+                    <div className="aspect-square bg-zinc-100 rounded mb-1 overflow-hidden">
+                      <img src="/products/2Xz9KjTySRxXzeM6VKL1.jpg" alt="Pant" className="w-full h-full object-cover" />
+                    </div>
+                    <div className="h-2 w-14 bg-zinc-300 rounded mb-1" />
+                    <div className="h-2 w-8 bg-zinc-400 rounded" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Home Indicator */}
+              <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-24 h-1 bg-white/70 rounded-full z-40" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Gallery of Active Banners with Mobile Support */}
+      <div className="bg-white p-6 sm:p-8 rounded-2xl border border-zinc-200/80 shadow-xs">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h4 className="text-lg font-serif font-bold text-zinc-900">
+              All Active Hero Banners ({banners.length})
+            </h4>
+            <p className="text-xs text-zinc-500 mt-0.5">
+              যেসব ব্যানারে মোবাইল ছবি সেট করা আছে সেগুলো স্বয়ংক্রিয়ভাবে মোবাইলে শো করবে।
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {banners.map((banner, idx) => (
+            <div 
+              key={banner.id || idx} 
+              className={`p-4 rounded-xl border transition-all ${
+                mobileHeroBannerForm.id === banner.id 
+                  ? 'border-blue-600 bg-blue-50/20 shadow-sm' 
+                  : 'border-zinc-200 hover:border-zinc-300 bg-white'
+              }`}
+            >
+              <div className="relative aspect-[16/9] max-h-56 overflow-hidden rounded-lg bg-zinc-950 mb-3 flex items-center justify-center">
+                <img 
+                  src={banner.mobile_image || banner.image || '/banners/hero_desktop.jpg'} 
+                  alt="Banner" 
+                  className={`w-full h-full ${banner.mobile_fit === 'cover' ? 'object-cover' : 'object-contain'}`}
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute top-2 left-2 flex gap-1.5">
+                  {banner.mobile_image ? (
+                    <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-xs">
+                      📱 Mobile Ready
+                    </span>
+                  ) : (
+                    <span className="bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-xs">
+                      ⚠️ Desktop Only
+                    </span>
+                  )}
+                  <span className="bg-black/60 text-white text-[10px] font-bold px-1.5 py-0.5 rounded backdrop-blur-xs">
+                    {banner.mobile_ratio ? banner.mobile_ratio.toUpperCase() : 'AUTO'}
+                  </span>
+                </div>
+              </div>
+
+              <h5 className="font-bold text-sm truncate text-zinc-900">
+                {banner.title || `Hero Banner #${idx + 1}`}
+              </h5>
+              <p className="text-xs text-zinc-500 truncate mb-3">
+                {banner.subtitle || banner.link || 'Homepage Hero'}
+              </p>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileHeroBannerForm({
+                      id: banner.id?.toString() || '',
+                      image: banner.image || banner.mobile_image || '',
+                      mobile_image: banner.mobile_image || banner.image || '',
+                      mobile_ratio: banner.mobile_ratio || '16/9',
+                      mobile_fit: banner.mobile_fit || 'cover',
+                      mobile_height: banner.mobile_height || undefined,
+                      title: banner.title || '',
+                      subtitle: banner.subtitle || '',
+                      buttonText: banner.buttonText || 'SHOP NOW',
+                      link: banner.link || 'shop'
+                    });
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="flex-1 py-1.5 px-3 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Edit size={13} />
+                  <span>Edit in Phone</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteBanner(banner.id!)}
+                  className="p-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                  title="Delete Banner"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const AdminPanel = ({ 
+  onBack, 
+  onRefreshProducts, 
+  onRefreshBanners, 
+  onRefreshPromoImage, 
+  onRefreshHeroVideo, 
+  onRefreshHeroImage, 
+  onRefreshCategories, 
+  onRefreshMiddleBanner, 
+  onRefreshMobileBannerConfig,
+  mobileBannerConfig,
+  setMobileBannerConfig,
+  showToast,
+  initialProducts
+}: { 
+  onBack: () => void, 
+  onRefreshProducts: () => void, 
+  onRefreshBanners: () => void, 
+  onRefreshPromoImage: () => void, 
+  onRefreshHeroVideo: () => void, 
+  onRefreshHeroImage: () => void, 
+  onRefreshCategories?: () => void, 
+  onRefreshMiddleBanner?: () => void, 
+  onRefreshMobileBannerConfig?: () => void,
+  mobileBannerConfig?: { ratio?: 'auto' | '16/9' | '2/1' | '4/3' | '1/1' | '4/5' | '8/9', fit?: 'contain' | 'cover', height?: number },
+  setMobileBannerConfig?: React.Dispatch<React.SetStateAction<any>>,
+  showToast: (msg: string, type?: 'success' | 'error' | 'info') => void,
+  initialProducts?: Product[]
+}) => {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>(() => {
+    if (initialProducts && initialProducts.length > 0) return initialProducts;
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('elegan_products') : null;
+    if (saved) {
+      try {
+        const p = JSON.parse(saved);
+        if (Array.isArray(p) && p.length > 0) return p;
+      } catch (e) {}
+    }
+    return defaultProducts;
+  });
   const [banners, setBanners] = useState<Banner[]>([]);
   const [customers, setCustomers] = useState<User[]>([]);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -3187,6 +3881,18 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [heroVideo, setHeroVideo] = useState('https://assets.mixkit.co/videos/preview/mixkit-man-in-a-suit-walking-slowly-4848-large.mp4');
   const [heroImage, setHeroImage] = useState('https://i.imgur.com/Vriu71z.png');
+  const [mobileHeroBannerForm, setMobileHeroBannerForm] = useState<Banner>({
+    id: '',
+    image: '',
+    mobile_image: '',
+    mobile_ratio: '16/9',
+    mobile_fit: 'cover',
+    title: '',
+    subtitle: '',
+    buttonText: '',
+    link: 'shop'
+  });
+  const [isMobileHeroSaving, setIsMobileHeroSaving] = useState(false);
   const [isVideoGenerating, setIsVideoGenerating] = useState(false);
   const [videoGenerationProgress, setVideoGenerationProgress] = useState('');
   const [hasApiKey, setHasApiKey] = useState(false);
@@ -3456,23 +4162,52 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
         };
         loadAdminOrders();
       } else if (activeTab === 'products') {
-        fetchProductsFromSupabase().then(res => {
-          const prods = (res && res.length > 0) ? res : (() => {
-            const saved = localStorage.getItem('elegan_products');
-            if (saved) { try { const p = JSON.parse(saved); if (Array.isArray(p) && p.length > 0) return p; } catch (e) {} }
-            return [];
-          })();
-          setProducts(prods);
-          initializeMasterStock(prods);
-          setLoading(false);
-        }).catch(() => {
-          const saved = localStorage.getItem('elegan_products');
-          const prods = (saved) ? (() => { try { return JSON.parse(saved); } catch(e) { return []; } })() : [];
-          setProducts(prods);
-          initializeMasterStock(prods);
-          setLoading(false);
-        });
-      } else if (activeTab === 'banners') {
+        // Instant synchronous display from localStorage or current state - 0ms delay
+        const saved = typeof window !== 'undefined' ? localStorage.getItem('elegan_products') : null;
+        let instantProds: Product[] = [];
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed) && parsed.length > 0) instantProds = parsed;
+          } catch (e) {}
+        }
+        if (instantProds.length === 0 && products.length > 0) {
+          instantProds = products;
+        } else if (instantProds.length === 0) {
+          instantProds = defaultProducts;
+        }
+
+        setProducts(instantProds);
+        initializeMasterStock(instantProds);
+        setLoading(false);
+
+        // Fetch fresh products from Firestore (primary) and Supabase (secondary) in background
+        const syncFreshProducts = async () => {
+          let loaded: Product[] | null = null;
+          try {
+            const pSnap = await getDocs(collection(db, 'products'));
+            if (pSnap && !pSnap.empty && pSnap.docs.length > 0) {
+              loaded = pSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
+            }
+          } catch (fErr) {
+            console.warn('Firestore products notice:', fErr);
+          }
+
+          if (!loaded || loaded.length === 0) {
+            try {
+              const supa = await fetchProductsFromSupabase();
+              if (supa && supa.length > 0) loaded = supa as Product[];
+            } catch (sErr) {}
+          }
+
+          if (loaded && loaded.length > 0) {
+            setProducts(loaded);
+            initializeMasterStock(loaded);
+            try { localStorage.setItem('elegan_products', JSON.stringify(loaded)); } catch (e) {}
+          }
+        };
+        syncFreshProducts();
+      } else if (activeTab === 'banners' || activeTab === 'mobile_banners') {
         const loadAdminBanners = async () => {
           try {
             const bSnap = await getDocs(collection(db, 'banners'));
@@ -3912,6 +4647,9 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
 
       const dataToSave = {
         ...productFormData,
+        description: productFormData.description || '',
+        fabric: productFormData.fabric || '',
+        fit: productFormData.fit || '',
         image: mainImage,
         images: rawImages,
         stock: computedStock,
@@ -3920,27 +4658,41 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
         colors: parsedColors
       };
 
-      if (editingProduct) {
-        await setDoc(doc(db, 'products', editingProduct.id.toString()), dataToSave);
-        await saveProductToSupabase({ id: editingProduct.id, ...dataToSave });
-        showToast('Product updated successfully', 'success');
-        setProducts(prev => {
-          const updated = prev.map(p => p.id === editingProduct.id ? { ...p, ...dataToSave } : p);
-          try { localStorage.setItem('elegan_products', JSON.stringify(updated)); } catch (e) {}
-          return updated;
-        });
-      } else {
-        const newId = 'prod_' + Date.now();
-        const newProd = { id: newId, ...dataToSave, rating: 5.0, reviews: 0 };
-        await setDoc(doc(db, 'products', newId), newProd);
-        await saveProductToSupabase(newProd);
-        showToast('Product added successfully', 'success');
-        setProducts(prev => {
-          const updated = [newProd, ...prev];
-          try { localStorage.setItem('elegan_products', JSON.stringify(updated)); } catch (e) {}
-          return updated;
-        });
+      const targetId = editingProduct ? editingProduct.id.toString() : ('prod_' + Date.now());
+      const fullProductRecord = {
+        id: targetId,
+        ...dataToSave,
+        rating: editingProduct ? (editingProduct.rating || 5.0) : 5.0,
+        reviews: editingProduct ? (editingProduct.reviews || 0) : 0
+      };
+
+      // 1. Immediately update local state & localStorage so description & product data are never lost
+      setProducts(prev => {
+        let updated: Product[];
+        if (editingProduct) {
+          updated = prev.map(p => p.id.toString() === targetId ? fullProductRecord : p);
+        } else {
+          updated = [fullProductRecord, ...prev];
+        }
+        try { localStorage.setItem('elegan_products', JSON.stringify(updated)); } catch (e) {}
+        return updated;
+      });
+
+      // 2. Persist to Firestore
+      try {
+        await setDoc(doc(db, 'products', targetId), fullProductRecord);
+      } catch (fErr) {
+        console.warn('Firestore setDoc notice:', fErr);
       }
+
+      // 3. Persist to Supabase
+      try {
+        await saveProductToSupabase(fullProductRecord);
+      } catch (sErr) {
+        console.warn('Supabase save notice:', sErr);
+      }
+
+      showToast(editingProduct ? 'Product updated successfully' : 'Product added successfully', 'success');
       setShowProductForm(false);
       setEditingProduct(null);
       setProductFormData({ 
@@ -4039,13 +4791,13 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
     setShowProductForm(true);
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'product' | 'banner' | 'banner_mobile' | 'top_rated_offer' | 'hero_image' | 'middle_banner' | 'middle_banner_mobile' = 'product') => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'product' | 'banner' | 'banner_mobile' | 'top_rated_offer' | 'hero_image' | 'middle_banner' | 'middle_banner_mobile' | 'mobile_hero' = 'product') => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     setIsUploading(true);
     try {
-      // Image compression logic
+      // Fast image compression logic
       const compressImage = (file: File): Promise<string> => {
         return new Promise((resolve, reject) => {
           const reader = new FileReader();
@@ -4055,8 +4807,8 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
             img.src = event.target?.result as string;
             img.onload = () => {
               const canvas = document.createElement('canvas');
-              const MAX_WIDTH = 1200;
-              const MAX_HEIGHT = 1200;
+              const MAX_WIDTH = type === 'product' ? 900 : type === 'mobile_hero' ? 1080 : 1200;
+              const MAX_HEIGHT = type === 'product' ? 900 : type === 'mobile_hero' ? 1350 : 1200;
               let width = img.width;
               let height = img.height;
 
@@ -4072,10 +4824,10 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
                 }
               }
 
-              canvas.width = width;
-              canvas.height = height;
+              canvas.width = Math.round(width);
+              canvas.height = Math.round(height);
               const ctx = canvas.getContext('2d');
-              ctx?.drawImage(img, 0, 0, width, height);
+              ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
               const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
               resolve(dataUrl);
             };
@@ -4086,11 +4838,10 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
       };
 
       if (type === 'product') {
-        const uploadedUrls: string[] = [];
-        for (let i = 0; i < files.length; i++) {
-          const url = await compressImage(files[i]);
-          uploadedUrls.push(url);
-        }
+        const fileList = Array.from(files) as File[];
+        const uploadedUrls = await Promise.all(
+          fileList.map(file => compressImage(file))
+        );
         setProductFormData(prev => {
           const existingImages = Array.isArray(prev.images) ? [...prev.images] : (prev.image ? [prev.image] : []);
           const combined = [...existingImages, ...uploadedUrls];
@@ -4108,6 +4859,12 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
           setBannerFormData(prev => ({ ...prev, image: url }));
         } else if (type === 'banner_mobile') {
           setBannerFormData(prev => ({ ...prev, mobile_image: url }));
+        } else if (type === 'mobile_hero') {
+          setMobileHeroBannerForm(prev => ({
+            ...prev,
+            mobile_image: url,
+            image: prev.image || url
+          }));
         } else if (type === 'top_rated_offer') {
           setTopRatedOfferImage(url);
           await setDoc(doc(db, 'settings', 'top_rated_offer_image'), { value: url });
@@ -4127,6 +4884,109 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
       showToast('Image upload failed. Please try again.', 'error');
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleSaveMobileHeroBanner = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const mobileImg = mobileHeroBannerForm.mobile_image || mobileHeroBannerForm.image;
+    if (!mobileImg) {
+      showToast('Please upload or enter a mobile banner image.', 'error');
+      return;
+    }
+    setIsMobileHeroSaving(true);
+    try {
+      const bannerId = mobileHeroBannerForm.id ? mobileHeroBannerForm.id.toString() : ('banner_' + Date.now());
+      const bannerToSave: Banner = {
+        id: bannerId,
+        image: mobileHeroBannerForm.image || mobileImg,
+        mobile_image: mobileImg,
+        mobile_ratio: mobileHeroBannerForm.mobile_ratio || '16/9',
+        mobile_fit: mobileHeroBannerForm.mobile_fit || 'cover',
+        mobile_height: mobileHeroBannerForm.mobile_height || undefined,
+        title: mobileHeroBannerForm.title || '',
+        subtitle: mobileHeroBannerForm.subtitle || '',
+        buttonText: mobileHeroBannerForm.buttonText || 'SHOP NOW',
+        link: mobileHeroBannerForm.link || 'shop',
+        created_at: new Date().toISOString()
+      };
+
+      await setDoc(doc(db, 'banners', bannerId), bannerToSave);
+      await saveBannerToSupabase(bannerToSave);
+
+      // Also ensure global mobile config has default
+      const currentGlobalRatio = mobileHeroBannerForm.mobile_ratio || '16/9';
+      const currentGlobalFit = mobileHeroBannerForm.mobile_fit || 'cover';
+      const updatedConfig = { 
+        ratio: currentGlobalRatio, 
+        fit: currentGlobalFit,
+        height: mobileHeroBannerForm.mobile_height || undefined
+      };
+      await setDoc(doc(db, 'settings', 'mobile_banner_config'), updatedConfig);
+      try { localStorage.setItem('elegan_mobile_banner_config', JSON.stringify(updatedConfig)); } catch (e) {}
+      if (setMobileBannerConfig) setMobileBannerConfig(updatedConfig as any);
+      if (onRefreshMobileBannerConfig) onRefreshMobileBannerConfig();
+
+      setBanners(prev => {
+        const index = prev.findIndex(b => b.id.toString() === bannerId);
+        let updated: Banner[];
+        if (index >= 0) {
+          updated = [...prev];
+          updated[index] = bannerToSave;
+        } else {
+          updated = [bannerToSave, ...prev];
+        }
+        try { localStorage.setItem('elegan_banners', JSON.stringify(updated)); } catch (err) {}
+        return updated;
+      });
+
+      setMobileHeroBannerForm(bannerToSave);
+      onRefreshBanners();
+      showToast('Mobile hero banner saved successfully!', 'success');
+    } catch (err: any) {
+      console.error('Failed to save mobile banner:', err);
+      showToast('Failed to save mobile banner: ' + (err.message || ''), 'error');
+    } finally {
+      setIsMobileHeroSaving(false);
+    }
+  };
+
+  const handleApplyMobileRatioToAll = async (ratio: 'auto' | '16/9' | '2/1' | '4/3' | '1/1' | '4/5' | '8/9', fit: 'contain' | 'cover') => {
+    setIsMobileHeroSaving(true);
+    try {
+      // 1. Update Global Config
+      const newConfig = { ratio, fit };
+      await setDoc(doc(db, 'settings', 'mobile_banner_config'), newConfig);
+      try { localStorage.setItem('elegan_mobile_banner_config', JSON.stringify(newConfig)); } catch (e) {}
+      if (setMobileBannerConfig) setMobileBannerConfig(newConfig as any);
+      if (onRefreshMobileBannerConfig) onRefreshMobileBannerConfig();
+
+      // 2. Update all banners
+      const updatedBanners = banners.map(b => ({
+        ...b,
+        mobile_ratio: ratio,
+        mobile_fit: fit
+      }));
+
+      for (const b of updatedBanners) {
+        if (b.id) {
+          await setDoc(doc(db, 'banners', b.id.toString()), b);
+          await saveBannerToSupabase(b);
+        }
+      }
+
+      setBanners(updatedBanners);
+      try { localStorage.setItem('elegan_banners', JSON.stringify(updatedBanners)); } catch (e) {}
+
+      // 3. Update form
+      setMobileHeroBannerForm(prev => ({ ...prev, mobile_ratio: ratio, mobile_fit: fit }));
+      onRefreshBanners();
+      showToast(`মোবাইল ব্যানার সাইজ সফলভাবে ${ratio.toUpperCase()} করা হয়েছে!`, 'success');
+    } catch (err: any) {
+      console.error('Failed to apply ratio to all:', err);
+      showToast('Failed to update: ' + (err.message || ''), 'error');
+    } finally {
+      setIsMobileHeroSaving(false);
     }
   };
 
@@ -4176,6 +5036,9 @@ const AdminPanel = ({ onBack, onRefreshProducts, onRefreshBanners, onRefreshProm
         id: bannerId,
         image: bannerFormData.image || '',
         mobile_image: bannerFormData.mobile_image || '',
+        mobile_ratio: (editingBanner && editingBanner.mobile_ratio) || '16/9',
+        mobile_fit: (editingBanner && editingBanner.mobile_fit) || 'cover',
+        mobile_height: editingBanner ? editingBanner.mobile_height : undefined,
         title: bannerFormData.title || '',
         subtitle: bannerFormData.subtitle || '',
         buttonText: bannerFormData.buttonText || 'Shop Now',
@@ -5512,8 +6375,9 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
     { id: 'orders', name: 'Orders', icon: <ShoppingBag size={19} /> },
     { id: 'products', name: 'Products', icon: <Package size={19} /> },
     { id: 'categories', name: 'Categories', icon: <Layers size={19} /> },
-    { id: 'supabase', name: 'Supabase Cloud', icon: <Database size={19} /> },
+    { id: 'mobile_banners', name: 'Mobile Hero Banner', icon: <Smartphone size={19} /> },
     { id: 'banners', name: 'Banner & CMS', icon: <Settings size={19} /> },
+    { id: 'supabase', name: 'Supabase Cloud', icon: <Database size={19} /> },
     { id: 'settings', name: 'Settings', icon: <SlidersHorizontal size={19} /> },
   ];
 
@@ -5958,7 +6822,14 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
                             const isMain = productFormData.image === imgUrl || (!productFormData.image && idx === 0);
                             return (
                               <div key={idx} className="relative group rounded-lg overflow-hidden border border-zinc-200 bg-white aspect-square flex flex-col justify-between shadow-xs">
-                                <img src={imgUrl} alt={`Product ${idx + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                <img 
+                                  src={imgUrl} 
+                                  alt={`Product ${idx + 1}`} 
+                                  className="w-full h-full object-cover" 
+                                  loading="eager" 
+                                  decoding="async" 
+                                  referrerPolicy="no-referrer" 
+                                />
                                 
                                 {isMain ? (
                                   <span className="absolute top-1.5 left-1.5 bg-zinc-900/90 text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded shadow-xs">
@@ -6059,16 +6930,8 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
                         </div>
                       </div>
                       <div className="md:col-span-2">
-                        <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Description</label>
-                        <textarea className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900" value={productFormData.description} onChange={e => setProductFormData({...productFormData, description: e.target.value})} rows={3} placeholder="Product description..." />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Fabric</label>
-                        <input className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900" value={productFormData.fabric} onChange={e => setProductFormData({...productFormData, fabric: e.target.value})} placeholder="Woven Cotton" />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Fit</label>
-                        <input className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900" value={productFormData.fit} onChange={e => setProductFormData({...productFormData, fit: e.target.value})} placeholder="Slim Fit" />
+                        <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Description (বিবরণ)</label>
+                        <textarea className="w-full border-b border-zinc-200 py-2 outline-none focus:border-zinc-900 text-sm" value={productFormData.description} onChange={e => setProductFormData({...productFormData, description: e.target.value})} rows={4} placeholder="Write product description..." />
                       </div>
                       <div className="md:col-span-2">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2">
@@ -6293,37 +7156,80 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {products.map(product => (
-                  <div key={product.id} className="bg-white border border-zinc-100 p-4 flex gap-4 items-center shadow-sm rounded-xl">
-                    <img src={product.image || null} alt={product.name} className="w-20 h-20 object-cover rounded-lg" referrerPolicy="no-referrer" />
-                    <div className="flex-grow">
-                      <h4 className="font-bold text-sm truncate max-w-[150px]">{product.name}</h4>
-                      <p className="text-xs text-zinc-500">৳{product.price}</p>
-                      <div className="mt-2 flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${
-                          product.stockStatus === 'In Stock' ? 'bg-green-500' :
-                          product.stockStatus === 'Low Stock' ? 'bg-amber-500' : 'bg-red-500'
-                        }`} />
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
-                          {product.stockStatus || 'In Stock'} ({product.stock || 0})
-                        </span>
+                {products.map(product => {
+                  const displayImage = product.image || (Array.isArray(product.images) && product.images[0]) || '/products/1Ek7JsTySRxXzeM6VKL0.jpg';
+                  return (
+                    <div key={product.id} className="bg-white border border-zinc-100 p-4 flex gap-4 items-center shadow-sm rounded-xl hover:border-zinc-300 transition-all">
+                      <div className="w-20 h-20 bg-zinc-100 rounded-lg overflow-hidden shrink-0 relative flex items-center justify-center border border-zinc-200/60">
+                        <img 
+                          src={displayImage} 
+                          alt={product.name} 
+                          className="w-full h-full object-cover rounded-lg" 
+                          loading="eager"
+                          decoding="async"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            if (!target.src.endsWith('/products/1Ek7JsTySRxXzeM6VKL0.jpg')) {
+                              target.src = '/products/1Ek7JsTySRxXzeM6VKL0.jpg';
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="flex-grow min-w-0">
+                        <h4 className="font-bold text-sm truncate" title={product.name}>{product.name}</h4>
+                        <p className="text-xs text-zinc-500 font-medium mt-0.5">৳{product.price}</p>
+                        <div className="mt-2 flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${
+                            product.stockStatus === 'In Stock' ? 'bg-green-500' :
+                            product.stockStatus === 'Low Stock' ? 'bg-amber-500' : 'bg-red-500'
+                          }`} />
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+                            {product.stockStatus || 'In Stock'} ({product.stock || 0})
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1 shrink-0">
+                        <button onClick={() => startEdit(product)} className="px-3 py-2 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-all flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest cursor-pointer">
+                          <Edit size={14} /> Edit
+                        </button>
+                        <button onClick={() => deleteProduct(product.id)} className="px-3 py-2 text-zinc-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest cursor-pointer">
+                          <Trash2 size={14} /> Delete
+                        </button>
                       </div>
                     </div>
-                    <div className="flex flex-col gap-1">
-                      <button onClick={() => startEdit(product)} className="px-3 py-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-all flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
-                        <Edit size={14} /> Edit
-                      </button>
-                      <button onClick={() => deleteProduct(product.id)} className="px-3 py-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
-                        <Trash2 size={14} /> Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
           {activeTab === 'banners' && (
             <div>
+              {/* Quick switch to dedicated Mobile Hero Banner */}
+              <div className="bg-gradient-to-r from-zinc-900 via-[#172033] to-zinc-900 text-white p-5 rounded-2xl mb-8 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm border border-zinc-800">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center shrink-0">
+                    <Smartphone size={22} className="text-blue-400" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-sm">Special Mobile Hero Banner (মোবাইল হিরো ব্যানার)</h4>
+                      <span className="bg-blue-500/30 text-blue-300 text-[10px] font-bold px-2 py-0.5 rounded">NEW</span>
+                    </div>
+                    <p className="text-xs text-zinc-300 mt-0.5">
+                      মোবাইল স্ক্রিনের জন্য নির্দিষ্ট সাইজ (800 × 900 px) এবং লাইভ ফোন প্রিভিউ সহ স্পেশাল ব্যানার পরিচালনা করুন।
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => setActiveTab('mobile_banners')}
+                  className="px-4 py-2.5 bg-[#cfa83b] text-[#111827] rounded-xl text-xs font-bold uppercase tracking-wider hover:brightness-110 transition-all shrink-0 shadow-xs cursor-pointer flex items-center gap-2 whitespace-nowrap"
+                >
+                  <Smartphone size={15} /> Open Mobile Banner Manager
+                </button>
+              </div>
+
               <div className="flex justify-between items-center mb-6">
                 <div>
                   <h3 className="text-xl font-serif font-bold">Banner Management</h3>
@@ -6693,6 +7599,27 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
             </div>
           )}
 
+          {/* Dedicated Mobile Hero Banner Management Tab */}
+          {activeTab === 'mobile_banners' && (
+            <MobileHeroBannerManager
+              banners={banners}
+              mobileHeroBannerForm={mobileHeroBannerForm}
+              setMobileHeroBannerForm={setMobileHeroBannerForm}
+              handleFileUpload={handleFileUpload}
+              handleSaveMobileHeroBanner={handleSaveMobileHeroBanner}
+              handleApplyMobileRatioToAll={handleApplyMobileRatioToAll}
+              globalMobileConfig={mobileBannerConfig}
+              onUpdateGlobalMobileConfig={async (cfg) => {
+                await handleApplyMobileRatioToAll(cfg.ratio, cfg.fit);
+              }}
+              isMobileHeroSaving={isMobileHeroSaving}
+              isUploading={isUploading}
+              deleteBanner={deleteBanner}
+              onOpenDesktopBanners={() => setActiveTab('banners')}
+              showToast={showToast}
+            />
+          )}
+
           {/* Supabase Cloud Tab */}
           {activeTab === 'supabase' && (
             <div className="space-y-6">
@@ -6788,6 +7715,17 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500 mb-1">Support Email</label>
                     <input type="text" readOnly value="eleganbdltd@gmail.com" className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl font-bold font-mono" />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-zinc-500">Facebook / Meta Pixel ID</label>
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Active & Tracking
+                      </span>
+                    </div>
+                    <input type="text" readOnly value={FB_PIXEL_ID} className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-xl font-bold font-mono text-zinc-800" />
+                    <p className="text-[11px] text-zinc-500 mt-1">E-commerce events: PageView, ViewContent, AddToCart, InitiateCheckout, Purchase.</p>
                   </div>
                 </div>
               </div>
@@ -7016,6 +7954,20 @@ export default function App() {
     link: 'shop'
   };
   const [middleBanner, setMiddleBanner] = useState<Banner>(defaultMiddleBanner);
+  const [mobileBannerConfig, setMobileBannerConfig] = useState<{
+    ratio: 'auto' | '16/9' | '2/1' | '4/3' | '1/1' | '4/5' | '8/9';
+    fit: 'contain' | 'cover';
+    height?: number;
+  }>(() => {
+    const saved = localStorage.getItem('elegan_mobile_banner_config');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.ratio) return parsed;
+      } catch (e) {}
+    }
+    return { ratio: '16/9', fit: 'cover' };
+  });
   const [topRatedOfferImage, setTopRatedOfferImage] = useState('');
   const [heroVideo, setHeroVideo] = useState('https://assets.mixkit.co/videos/preview/mixkit-man-in-a-suit-walking-slowly-4848-large.mp4');
   const [heroImage, setHeroImage] = useState('https://i.imgur.com/Vriu71z.png');
@@ -7265,10 +8217,29 @@ export default function App() {
     }
   };
 
+  const fetchMobileBannerConfig = async () => {
+    try {
+      const snap = await getDoc(doc(db, 'settings', 'mobile_banner_config'));
+      if (snap.exists()) {
+        const data = snap.data();
+        const config = {
+          ratio: data.ratio || '16/9',
+          fit: data.fit || 'cover',
+          height: data.height || undefined
+        };
+        setMobileBannerConfig(config as any);
+        try { localStorage.setItem('elegan_mobile_banner_config', JSON.stringify(config)); } catch (e) {}
+      }
+    } catch (err) {
+      console.warn('Fetch mobile banner config notice:', err);
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
     fetchBanners();
     fetchMiddleBanner();
+    fetchMobileBannerConfig();
     fetchPromoImage();
     fetchHeroVideo();
     fetchHeroImage();
@@ -7312,23 +8283,25 @@ export default function App() {
     setCurrentPage(page);
     setSelectedProduct(null);
     setOrderSuccess(false);
+    trackPageView(page);
     window.scrollTo(0, 0);
   };
 
   const handleProductSelect = (product: Product) => {
     setSelectedProduct(product);
     setCurrentPage('product-details');
+    trackViewContent(product);
     window.scrollTo(0, 0);
   };
 
   const handleBuyNow = (product: Product, size: any, color?: string) => {
-    // We update addToCart call here
     addToCart(product, size, color);
     setCurrentPage('checkout');
     window.scrollTo(0, 0);
   };
 
   const addToCart = (product: Product, size: any, color?: string) => {
+    trackAddToCart(product, 1, size, color);
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id && item.selectedSize === size && item.selectedColor === color);
       if (existing) {
@@ -7376,7 +8349,12 @@ export default function App() {
         onRefreshHeroVideo={fetchHeroVideo}
         onRefreshHeroImage={fetchHeroImage}
         onRefreshCategories={fetchCategories}
+        onRefreshMiddleBanner={fetchMiddleBanner}
+        onRefreshMobileBannerConfig={fetchMobileBannerConfig}
+        mobileBannerConfig={mobileBannerConfig}
+        setMobileBannerConfig={setMobileBannerConfig}
         showToast={showToast}
+        initialProducts={products}
       />
     );
   }
@@ -7406,7 +8384,7 @@ export default function App() {
   const filteredShopProducts = products.filter(product => {
     const matchSearch = !searchQuery || 
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      product.description.toLowerCase().includes(searchQuery.toLowerCase());
+      (product.description || '').toLowerCase().includes(searchQuery.toLowerCase());
       
     const matchCategory = !selectedCategory || product.category === selectedCategory;
     
@@ -7575,7 +8553,11 @@ export default function App() {
       <main className="flex-grow">
         {currentPage === 'home' && (
           <div className="pt-16">
-            <BannerCarousel banners={banners} />
+            <BannerCarousel 
+              banners={banners} 
+              onNavigate={handleNavigate} 
+              mobileConfig={mobileBannerConfig}
+            />
             <TrustFeatureBadges />
 
             <FeaturedCollection 
@@ -7586,6 +8568,17 @@ export default function App() {
               onToggleWishlist={handleToggleWishlist}
               categories={categories}
               filterType="pant"
+            />
+
+            {/* Shirt Collection Section */}
+            <FeaturedCollection 
+              title="EXPLORE OUR SHIRT COLLECTION"
+              products={products}
+              onSelect={handleProductSelect}
+              user={user}
+              onToggleWishlist={handleToggleWishlist}
+              categories={categories}
+              filterType="shirt"
             />
 
             {/* Top Rated Products Section */}
@@ -7607,17 +8600,6 @@ export default function App() {
                 />
               </div>
             </section>
-
-            {/* Shirt Collection Section */}
-            <FeaturedCollection 
-              title="EXPLORE OUR SHIRT COLLECTION"
-              products={products}
-              onSelect={handleProductSelect}
-              user={user}
-              onToggleWishlist={handleToggleWishlist}
-              categories={categories}
-              filterType="shirt"
-            />
 
             {/* Trust Section */}
             <section className="py-20 md:py-32 bg-white">
@@ -7826,7 +8808,11 @@ export default function App() {
             onRefreshHeroImage={fetchHeroImage}
             onRefreshCategories={fetchCategories}
             onRefreshMiddleBanner={fetchMiddleBanner}
+            onRefreshMobileBannerConfig={fetchMobileBannerConfig}
+            mobileBannerConfig={mobileBannerConfig}
+            setMobileBannerConfig={setMobileBannerConfig}
             showToast={showToast}
+            initialProducts={products}
           />
         )}
 

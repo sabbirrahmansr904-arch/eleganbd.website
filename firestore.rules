@@ -25,13 +25,9 @@ service cloud.firestore {
     // Rules
     // ===============================================================
     
-    // Products: Anyone can read, only admin can write, allow stock updates
+    // Products: Anyone can read, allow products management
     match /products/{productId} {
-      allow read: if true;
-      allow update: if isAdmin() || (
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stockMap', 'stock'])
-      );
-      allow create, delete: if isAdmin();
+      allow read, write: if true;
     }
 
     // Banners: Anyone can read, allow admin or authenticated app to manage banners
