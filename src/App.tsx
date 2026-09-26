@@ -504,6 +504,332 @@ const WishlistPage = ({ user, products, onSelect, onBack, onNavigate, onToggleWi
   );
 };
 
+const triggerIframePrint = (order: any) => {
+  if (!order) return;
+
+  const parsedItems: any[] = typeof order.items === 'string' 
+    ? (() => { try { return JSON.parse(order.items); } catch { return []; } })() 
+    : (Array.isArray(order.items) ? order.items : []);
+
+  const subtotal = order.subtotal || parsedItems.reduce((acc, item) => acc + (Number(item.price || 0) * Number(item.quantity || 1)), 0);
+  const deliveryCharge = order.shipping_cost ?? order.shippingCost ?? order.shipping ?? (order.shipping_zone === 'Inside Dhaka' ? 70 : 130);
+  const advancePayment = order.advance_payment ?? order.advancePayment ?? 0;
+  const discountAmount = order.discount_amount ?? order.discount ?? 0;
+  const totalAmount = order.total_amount ?? order.totalAmount ?? (subtotal + deliveryCharge - advancePayment - discountAmount);
+
+  const itemNames = parsedItems.map(i => `${i.name || ''}`).filter(Boolean).join(', ') || 'Formal Wear';
+  const itemSizes = parsedItems.map(i => i.selectedSize || '-').filter(Boolean).join(',') || '-';
+  const totalQty = parsedItems.reduce((sum, i) => sum + Number(i.quantity || 1), 0);
+
+  const rawDate = order.created_at || order.createdAt;
+  const formattedDate = rawDate 
+    ? new Date(rawDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '-')
+    : new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }).replace(/\//g, '-');
+
+  const invoiceNum = String(order.id || '269102').replace(/\D/g, '').slice(-6) || '269102';
+  const orderNum = invoiceNum.slice(-3) || '102';
+
+  const rowsHtml = parsedItems.length > 0 
+    ? parsedItems.map((item: any) => `
+        <tr style="border-bottom: 1px solid #000;">
+          <td style="padding: 6px; border-right: 1px solid #000; font-weight: bold;">${item.name || ''}</td>
+          <td style="padding: 6px; border-right: 1px solid #000; text-align: center; font-weight: bold;">${item.selectedSize || '-'}</td>
+          <td style="padding: 6px; border-right: 1px solid #000; text-align: center; font-weight: bold;">${item.quantity || 1}</td>
+          <td style="padding: 6px; text-align: right; font-weight: bold;">${Number(item.price || 0) * Number(item.quantity || 1)}</td>
+        </tr>
+      `).join('')
+    : `
+        <tr style="border-bottom: 1px solid #000;">
+          <td style="padding: 6px; border-right: 1px solid #000; font-weight: bold;">${itemNames}</td>
+          <td style="padding: 6px; border-right: 1px solid #000; text-align: center; font-weight: bold;">${itemSizes}</td>
+          <td style="padding: 6px; border-right: 1px solid #000; text-align: center; font-weight: bold;">${totalQty}</td>
+          <td style="padding: 6px; text-align: right; font-weight: bold;">${subtotal}</td>
+        </tr>
+      `;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Invoice #${invoiceNum}</title>
+        <style>
+          @page {
+            size: A5 portrait;
+            margin: 3mm;
+          }
+          * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          body {
+            font-family: Arial, Helvetica, sans-serif;
+            margin: 0;
+            padding: 12px;
+            color: #000;
+            background: #fff;
+            font-size: 11px;
+            line-height: 1.3;
+          }
+          .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 4px;
+          }
+          .header h1 {
+            font-size: 22px;
+            font-weight: 900;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: -0.5px;
+          }
+          .header-right {
+            text-align: right;
+          }
+          .header-right h2 {
+            font-size: 20px;
+            font-weight: 900;
+            margin: 0;
+            line-height: 1;
+          }
+          .divider {
+            border-bottom: 2px solid #000;
+            margin: 6px 0;
+          }
+          .bill-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+          }
+          .bill-to {
+            width: 55%;
+          }
+          .meta-right {
+            text-align: right;
+            width: 40%;
+          }
+          .meta-row {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            font-weight: bold;
+            margin-bottom: 2px;
+          }
+          table.items-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 2px solid #000;
+            margin-bottom: 0;
+          }
+          table.items-table th {
+            border-bottom: 2px solid #000;
+            background: #f4f4f5;
+            padding: 6px;
+            font-weight: bold;
+            text-align: center;
+          }
+          .summary-container {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 10px;
+          }
+          .summary-table {
+            width: 50%;
+            border: 2px solid #000;
+            border-top: none;
+            border-collapse: collapse;
+          }
+          .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 8px;
+            border-bottom: 1px solid #000;
+            font-weight: bold;
+          }
+          .summary-row.total {
+            border-top: 2px solid #000;
+            border-bottom: none;
+            background: #f4f4f5;
+            font-size: 13px;
+            font-weight: 900;
+            padding: 6px 8px;
+          }
+          .footer-note {
+            margin-top: 8px;
+            margin-bottom: 12px;
+          }
+          .footer-thanks {
+            text-align: center;
+            border-top: 1px solid #000;
+            padding-top: 6px;
+            font-weight: bold;
+          }
+          .barcode-box {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            background: #000;
+            height: 22px;
+            width: 110px;
+            padding: 2px;
+            margin-left: auto;
+            margin-top: 4px;
+            border-radius: 2px;
+          }
+          .barcode-bar {
+            background: #fff;
+            height: 16px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <h1>INVOICE</h1>
+            <div style="font-size: 9px; font-weight: 500; margin-top: 2px; line-height: 1.2;">
+              MA VILLA, HOUSE-11, ROAD-3, BLOCK F,<br />
+              MIRPUR-1, DHAKA-1216, BANGLADESH
+            </div>
+            <div style="font-size: 10px; font-weight: bold; margin-top: 4px;">
+              Elegan BD Hotline Number : 01631496122
+            </div>
+          </div>
+          <div class="header-right">
+            <h2>Elegan BD</h2>
+            <div style="font-size: 8px; font-weight: bold; font-style: italic; max-width: 130px; margin-top: 2px; line-height: 1.2;">
+              Fashion in everyday life make you stylist
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="bill-meta">
+          <div class="bill-to">
+            <div style="font-weight: bold; text-decoration: underline; margin-bottom: 3px;">Bill To</div>
+            <div style="font-weight: bold; font-size: 11px;">${order.customer_name || order.customerName || 'Md. Hasan Murad'}</div>
+            <div style="font-weight: bold; font-family: monospace; margin: 2px 0;">${order.phone || '01711977415'}</div>
+            <div style="font-size: 10px; line-height: 1.2;">${order.address || ''}</div>
+          </div>
+
+          <div class="meta-right">
+            <div class="meta-row">
+              <span>Date:</span>
+              <span style="font-family: monospace; width: 60px;">${formattedDate}</span>
+            </div>
+            <div class="meta-row">
+              <span>Invoice#</span>
+              <span style="font-family: monospace; width: 60px;">${invoiceNum}</span>
+            </div>
+            <div class="meta-row">
+              <span>ON:</span>
+              <span style="font-family: monospace; width: 60px;">${orderNum}</span>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 4px; margin-top: 3px;">
+              <span style="background: #059669; color: #fff; font-size: 8px; font-weight: bold; padding: 1px 4px; border-radius: 2px;">✓</span>
+              <span style="background: #059669; color: #fff; font-size: 8px; font-weight: bold; padding: 1px 4px; border-radius: 2px;">✓</span>
+            </div>
+            <div class="barcode-box">
+              ${[...Array(20)].map((_, i) => `<div class="barcode-bar" style="width: ${i % 3 === 0 ? '1px' : '2px'};"></div>`).join('')}
+            </div>
+          </div>
+        </div>
+
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th style="width: 45%; text-align: left; border-right: 1px solid #000;">Item</th>
+              <th style="width: 18%; border-right: 1px solid #000;">Size</th>
+              <th style="width: 15%; border-right: 1px solid #000;">QTY.</th>
+              <th style="width: 22%; text-align: right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+            <tr style="height: 90px;">
+              <td style="border-right: 1px solid #000;"></td>
+              <td style="border-right: 1px solid #000;"></td>
+              <td style="border-right: 1px solid #000;"></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="summary-container">
+          <div class="summary-table">
+            <div class="summary-row">
+              <span>Sub Total</span>
+              <span>${subtotal}</span>
+            </div>
+            <div class="summary-row">
+              <span>Delivery Charge</span>
+              <span>${deliveryCharge}</span>
+            </div>
+            <div class="summary-row">
+              <span>Advance Payment</span>
+              <span>${advancePayment > 0 ? advancePayment : ''}</span>
+            </div>
+            <div class="summary-row">
+              <span>Discount</span>
+              <span>${discountAmount > 0 ? discountAmount : ''}</span>
+            </div>
+            <div class="summary-row total">
+              <span>TOTAL</span>
+              <span>${totalAmount}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer-note">
+          <div style="font-weight: bold;">
+            Invoice By: <span style="font-weight: normal; text-decoration: underline; margin-left: 8px;">${order.invoiceBy || 'Shamiul'}</span>
+          </div>
+          <div style="font-weight: bold; margin-top: 2px;">
+            Note: <span style="font-weight: normal; margin-left: 8px;">${order.note || ''}</span>
+          </div>
+        </div>
+
+        <div class="footer-thanks">
+          <div style="font-size: 11px; font-weight: bold;">3 Days Exchange & Return Available</div>
+          <div style="font-size: 10px; font-weight: 500; margin-top: 2px;">Thanks For Choosing Elegan BD</div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  let iframe = document.getElementById('elegan-print-iframe') as HTMLIFrameElement;
+  if (!iframe) {
+    iframe = document.createElement('iframe');
+    iframe.id = 'elegan-print-iframe';
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0px';
+    iframe.style.height = '0px';
+    iframe.style.border = '0px';
+    document.body.appendChild(iframe);
+  }
+
+  const doc = iframe.contentWindow?.document || iframe.contentDocument;
+  if (doc) {
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    setTimeout(() => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (err) {
+        console.error('Iframe print error:', err);
+        window.print();
+      }
+    }, 200);
+  }
+};
+
 const OrderPrintModal = ({ 
   order, 
   onClose 
@@ -537,205 +863,190 @@ const OrderPrintModal = ({
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      window.print();
-    }, 350);
+      triggerIframePrint(order);
+    }, 250);
     return () => clearTimeout(timer);
-  }, []);
+  }, [order]);
 
   const handlePrint = () => {
-    window.print();
+    triggerIframePrint(order);
   };
 
-  const memoMarkup = (
-    <div className="text-black bg-white font-sans p-6 w-[148mm] min-h-[200mm] text-xs leading-snug">
-      {/* Top Header */}
-      <div className="flex justify-between items-start mb-1">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-black uppercase">INVOICE</h1>
-          <p className="text-[10px] text-black font-medium leading-tight mt-0.5">
-            MA VILLA, HOUSE-11, ROAD-3, BLOCK F,<br />
-            MIRPUR-1, DHAKA-1216, BANGLADESH
-          </p>
-          <p className="text-[11px] font-bold text-black mt-1.5">
-            Elegan BD Hotline Number : 01631496122
-          </p>
-        </div>
-        <div className="text-right">
-          <h2 className="text-2xl font-black text-black tracking-tight leading-none">Elegan BD</h2>
-          <p className="text-[9px] font-bold text-black mt-1 italic max-w-[140px] leading-tight">
-            Fashion in everyday life make you stylist
-          </p>
-        </div>
-      </div>
-
-      {/* Underline Divider */}
-      <div className="w-full border-b-2 border-black my-2" />
-
-      {/* Bill To & Invoice Meta Section */}
-      <div className="flex justify-between items-start mb-3 pt-1">
-        <div className="max-w-[55%]">
-          <p className="font-bold underline text-xs text-black mb-1">Bill To</p>
-          <p className="font-bold text-xs text-black">{order.customer_name || order.customerName || 'Md. Hasan Murad'}</p>
-          <p className="font-bold text-xs text-black font-mono my-0.5">{order.phone || '01711977415'}</p>
-          <p className="text-[11px] text-black leading-tight">{order.address || ''}</p>
+  return (
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden my-auto flex flex-col max-h-[95vh] border border-zinc-200">
+        {/* Modal Header */}
+        <div className="p-4 bg-zinc-900 text-white flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <Printer size={18} className="text-amber-400" />
+            <h3 className="text-sm font-bold uppercase tracking-wider">A5 Cash Memo Preview (ক্যাশ মেমো ফ্রিভিউ)</h3>
+          </div>
+          <div className="flex items-center gap-3">
+            <button 
+              type="button"
+              onClick={handlePrint}
+              className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-all flex items-center gap-2 shadow-md cursor-pointer"
+            >
+              <Printer size={15} /> Print Now (প্রিন্ট করুন)
+            </button>
+            <button 
+              type="button"
+              onClick={onClose} 
+              className="p-1.5 hover:bg-zinc-800 rounded-full text-zinc-300 hover:text-white transition-colors cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
-        <div className="text-right space-y-0.5 text-xs">
-          <div className="flex justify-end gap-3 font-bold">
-            <span>Date:</span>
-            <span className="w-16 text-right font-mono">{formattedDate}</span>
-          </div>
-          <div className="flex justify-end gap-3 font-bold">
-            <span>Invoice#</span>
-            <span className="w-16 text-right font-mono">{invoiceNum}</span>
-          </div>
-          <div className="flex justify-end gap-3 font-bold">
-            <span>ON:</span>
-            <span className="w-16 text-right font-mono">{orderNum}</span>
-          </div>
-          <div className="flex justify-end items-center gap-1 mt-1">
-            <span className="inline-block w-4 h-4 bg-emerald-600 text-white text-[9px] font-bold text-center leading-4 rounded-xs">✓</span>
-            <span className="inline-block w-4 h-4 bg-emerald-600 text-white text-[9px] font-bold text-center leading-4 rounded-xs">✓</span>
-          </div>
-          <div className="pt-1 flex justify-end">
-            <div className="h-6 w-28 bg-black flex items-center justify-around px-1 rounded-xs">
-              {[...Array(22)].map((_, i) => (
-                <div key={i} className={`h-4 bg-white ${i % 3 === 0 ? 'w-0.5' : 'w-1'}`} />
-              ))}
+        {/* Scrollable Container containing the A5 Invoice Preview */}
+        <div className="p-6 bg-zinc-100 overflow-y-auto flex-1 flex justify-center">
+          <div className="shadow-lg border border-zinc-300 bg-white rounded-xs">
+            <div className="text-black bg-white font-sans p-6 w-[148mm] min-h-[200mm] text-xs leading-snug">
+              {/* Top Header */}
+              <div className="flex justify-between items-start mb-1">
+                <div>
+                  <h1 className="text-2xl font-black tracking-tight text-black uppercase">INVOICE</h1>
+                  <p className="text-[10px] text-black font-medium leading-tight mt-0.5">
+                    MA VILLA, HOUSE-11, ROAD-3, BLOCK F,<br />
+                    MIRPUR-1, DHAKA-1216, BANGLADESH
+                  </p>
+                  <p className="text-[11px] font-bold text-black mt-1.5">
+                    Elegan BD Hotline Number : 01631496122
+                  </p>
+                </div>
+                <div className="text-right">
+                  <h2 className="text-2xl font-black text-black tracking-tight leading-none">Elegan BD</h2>
+                  <p className="text-[9px] font-bold text-black mt-1 italic max-w-[140px] leading-tight">
+                    Fashion in everyday life make you stylist
+                  </p>
+                </div>
+              </div>
+
+              {/* Underline Divider */}
+              <div className="w-full border-b-2 border-black my-2" />
+
+              {/* Bill To & Invoice Meta Section */}
+              <div className="flex justify-between items-start mb-3 pt-1">
+                <div className="max-w-[55%]">
+                  <p className="font-bold underline text-xs text-black mb-1">Bill To</p>
+                  <p className="font-bold text-xs text-black">{order.customer_name || order.customerName || 'Md. Hasan Murad'}</p>
+                  <p className="font-bold text-xs text-black font-mono my-0.5">{order.phone || '01711977415'}</p>
+                  <p className="text-[11px] text-black leading-tight">{order.address || ''}</p>
+                </div>
+
+                <div className="text-right space-y-0.5 text-xs">
+                  <div className="flex justify-end gap-3 font-bold">
+                    <span>Date:</span>
+                    <span className="w-16 text-right font-mono">{formattedDate}</span>
+                  </div>
+                  <div className="flex justify-end gap-3 font-bold">
+                    <span>Invoice#</span>
+                    <span className="w-16 text-right font-mono">{invoiceNum}</span>
+                  </div>
+                  <div className="flex justify-end gap-3 font-bold">
+                    <span>ON:</span>
+                    <span className="w-16 text-right font-mono">{orderNum}</span>
+                  </div>
+                  <div className="flex justify-end items-center gap-1 mt-1">
+                    <span className="inline-block w-4 h-4 bg-emerald-600 text-white text-[9px] font-bold text-center leading-4 rounded-xs">✓</span>
+                    <span className="inline-block w-4 h-4 bg-emerald-600 text-white text-[9px] font-bold text-center leading-4 rounded-xs">✓</span>
+                  </div>
+                  <div className="pt-1 flex justify-end">
+                    <div className="h-6 w-28 bg-black flex items-center justify-around px-1 rounded-xs">
+                      {[...Array(22)].map((_, i) => (
+                        <div key={i} className={`h-4 bg-white ${i % 3 === 0 ? 'w-0.5' : 'w-1'}`} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Items Table */}
+              <div className="border-2 border-black rounded-xs mb-0 overflow-hidden">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b-2 border-black bg-zinc-100 font-bold text-center text-black">
+                      <th className="py-1.5 px-2 border-r border-black w-[45%] text-left">Item</th>
+                      <th className="py-1.5 px-2 border-r border-black w-[18%]">Size</th>
+                      <th className="py-1.5 px-2 border-r border-black w-[15%]">QTY.</th>
+                      <th className="py-1.5 px-2 w-[22%] text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsedItems.length > 0 ? (
+                      parsedItems.map((item: any, idx: number) => (
+                        <tr key={idx} className="border-b border-black last:border-b-0 text-black">
+                          <td className="py-2 px-2 border-r border-black font-bold">{item.name}</td>
+                          <td className="py-2 px-2 border-r border-black text-center font-bold">{item.selectedSize || '-'}</td>
+                          <td className="py-2 px-2 border-r border-black text-center font-bold">{item.quantity}</td>
+                          <td className="py-2 px-2 text-right font-bold">{item.price * item.quantity}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr className="text-black">
+                        <td className="py-2 px-2 border-r border-black font-bold">{itemNames}</td>
+                        <td className="py-2 px-2 border-r border-black text-center font-bold">{itemSizes}</td>
+                        <td className="py-2 px-2 border-r border-black text-center font-bold">{totalQty}</td>
+                        <td className="py-2 px-2 text-right font-bold">{subtotal}</td>
+                      </tr>
+                    )}
+                    <tr className="h-28">
+                      <td className="border-r border-black" />
+                      <td className="border-r border-black" />
+                      <td className="border-r border-black" />
+                      <td />
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Bottom Financial Summary Grid */}
+              <div className="flex justify-end mb-4">
+                <div className="w-[50%] border-2 border-t-0 border-black text-xs font-bold divide-y divide-black border-black">
+                  <div className="flex justify-between py-1 px-2 text-black">
+                    <span>Sub Total</span>
+                    <span>{subtotal}</span>
+                  </div>
+                  <div className="flex justify-between py-1 px-2 text-black">
+                    <span>Delivery Charge</span>
+                    <span>{deliveryCharge}</span>
+                  </div>
+                  <div className="flex justify-between py-1 px-2 text-black">
+                    <span>Advance Payment</span>
+                    <span>{advancePayment > 0 ? advancePayment : ''}</span>
+                  </div>
+                  <div className="flex justify-between py-1 px-2 text-black">
+                    <span>Discount</span>
+                    <span>{discountAmount > 0 ? discountAmount : ''}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 px-2 bg-zinc-100 text-black text-sm border-t-2 border-black font-black">
+                    <span>TOTAL</span>
+                    <span>{totalAmount}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Invoice By & Note */}
+              <div className="space-y-1 mb-6 text-xs">
+                <p className="font-bold text-black">
+                  Invoice By: <span className="font-normal underline ml-2">{order.invoiceBy || 'Shamiul'}</span>
+                </p>
+                <p className="font-bold text-black">
+                  Note: <span className="font-normal ml-2">{order.note || ''}</span>
+                </p>
+              </div>
+
+              {/* Footer Text */}
+              <div className="text-center space-y-1 pt-2 border-t border-black text-xs font-bold text-black">
+                <p className="text-sm font-bold">3 Days Exchange & Return Available</p>
+                <p className="text-xs font-medium">Thanks For Choosing Elegan BD</p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Items Table */}
-      <div className="border-2 border-black rounded-xs mb-0 overflow-hidden">
-        <table className="w-full text-left text-xs border-collapse">
-          <thead>
-            <tr className="border-b-2 border-black bg-zinc-100 font-bold text-center text-black">
-              <th className="py-1.5 px-2 border-r border-black w-[45%] text-left">Item</th>
-              <th className="py-1.5 px-2 border-r border-black w-[18%]">Size</th>
-              <th className="py-1.5 px-2 border-r border-black w-[15%]">QTY.</th>
-              <th className="py-1.5 px-2 w-[22%] text-right">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {parsedItems.length > 0 ? (
-              parsedItems.map((item: any, idx: number) => (
-                <tr key={idx} className="border-b border-black last:border-b-0 text-black">
-                  <td className="py-2 px-2 border-r border-black font-bold">{item.name}</td>
-                  <td className="py-2 px-2 border-r border-black text-center font-bold">{item.selectedSize || '-'}</td>
-                  <td className="py-2 px-2 border-r border-black text-center font-bold">{item.quantity}</td>
-                  <td className="py-2 px-2 text-right font-bold">{item.price * item.quantity}</td>
-                </tr>
-              ))
-            ) : (
-              <tr className="text-black">
-                <td className="py-2 px-2 border-r border-black font-bold">{itemNames}</td>
-                <td className="py-2 px-2 border-r border-black text-center font-bold">{itemSizes}</td>
-                <td className="py-2 px-2 border-r border-black text-center font-bold">{totalQty}</td>
-                <td className="py-2 px-2 text-right font-bold">{subtotal}</td>
-              </tr>
-            )}
-            <tr className="h-28">
-              <td className="border-r border-black" />
-              <td className="border-r border-black" />
-              <td className="border-r border-black" />
-              <td />
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      {/* Bottom Financial Summary Grid */}
-      <div className="flex justify-end mb-4">
-        <div className="w-[50%] border-2 border-t-0 border-black text-xs font-bold divide-y divide-black border-black">
-          <div className="flex justify-between py-1 px-2 text-black">
-            <span>Sub Total</span>
-            <span>{subtotal}</span>
-          </div>
-          <div className="flex justify-between py-1 px-2 text-black">
-            <span>Delivery Charge</span>
-            <span>{deliveryCharge}</span>
-          </div>
-          <div className="flex justify-between py-1 px-2 text-black">
-            <span>Advance Payment</span>
-            <span>{advancePayment > 0 ? advancePayment : ''}</span>
-          </div>
-          <div className="flex justify-between py-1 px-2 text-black">
-            <span>Discount</span>
-            <span>{discountAmount > 0 ? discountAmount : ''}</span>
-          </div>
-          <div className="flex justify-between py-1.5 px-2 bg-zinc-100 text-black text-sm border-t-2 border-black font-black">
-            <span>TOTAL</span>
-            <span>{totalAmount}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Invoice By & Note */}
-      <div className="space-y-1 mb-6 text-xs">
-        <p className="font-bold text-black">
-          Invoice By: <span className="font-normal underline ml-2">{order.invoiceBy || 'Shamiul'}</span>
-        </p>
-        <p className="font-bold text-black">
-          Note: <span className="font-normal ml-2">{order.note || ''}</span>
-        </p>
-      </div>
-
-      {/* Footer Text */}
-      <div className="text-center space-y-1 pt-2 border-t border-black text-xs font-bold text-black">
-        <p className="text-sm font-bold">3 Days Exchange & Return Available</p>
-        <p className="text-xs font-medium">Thanks For Choosing Elegan BD</p>
       </div>
     </div>
-  );
-
-  return (
-    <>
-      {/* On-Screen Modal Container */}
-      <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 overflow-y-auto">
-        <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden my-auto flex flex-col max-h-[95vh] border border-zinc-200">
-          {/* Modal Header */}
-          <div className="p-4 bg-zinc-900 text-white flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <Printer size={18} className="text-amber-400" />
-              <h3 className="text-sm font-bold uppercase tracking-wider">A5 Cash Memo Preview (ক্যাশ মেমো ফ্রিভিউ)</h3>
-            </div>
-            <div className="flex items-center gap-3">
-              <button 
-                type="button"
-                onClick={handlePrint}
-                className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-all flex items-center gap-2 shadow-md cursor-pointer"
-              >
-                <Printer size={15} /> Print Now (প্রিন্ট করুন)
-              </button>
-              <button 
-                type="button"
-                onClick={onClose} 
-                className="p-1.5 hover:bg-zinc-800 rounded-full text-zinc-300 hover:text-white transition-colors cursor-pointer"
-              >
-                <X size={20} />
-              </button>
-            </div>
-          </div>
-
-          {/* Scrollable Container containing the A5 Invoice Preview */}
-          <div className="p-6 bg-zinc-100 overflow-y-auto flex-1 flex justify-center">
-            <div className="shadow-lg border border-zinc-300 bg-white rounded-xs">
-              {memoMarkup}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Separate Top-Level Portal for @media print */}
-      {createPortal(
-        <div id="printable-invoice-container">
-          {memoMarkup}
-        </div>,
-        document.body
-      )}
-    </>
   );
 };
 
