@@ -1888,7 +1888,7 @@ const ReviewsPage = ({ onBack }: { onBack: () => void }) => {
       </button>
 
       <div className="text-center mb-16">
-        <h1 className="text-4xl font-serif font-bold text-zinc-900 mb-4">Customer Reviews</h1>
+        <h1 className="text-4xl font-serif font-bold text-zinc-900 mb-4">Reviews</h1>
         <p className="text-zinc-500">What our 100+ customers say about our products</p>
       </div>
 
@@ -2105,7 +2105,7 @@ const CustomerReviewsSection = ({ showToast }: { showToast?: (msg: string, type?
         {/* Section Header */}
         <div className="text-center mb-6 sm:mb-8">
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-black text-zinc-950 uppercase tracking-tight">
-            CUSTOMER REVIEWS
+            REVIEWS
           </h2>
           <p className="text-xs sm:text-sm font-semibold tracking-[0.25em] text-zinc-500 uppercase mt-3 sm:mt-4">
             WHAT OUR CUSTOMERS SAY
