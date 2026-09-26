@@ -62,7 +62,9 @@ import {
   Edit2,
   Smartphone,
   Printer,
-  FileText
+  FileText,
+  UserPlus,
+  PlusCircle
 } from 'lucide-react';
 import { 
   supabase, 
@@ -502,7 +504,13 @@ const WishlistPage = ({ user, products, onSelect, onBack, onNavigate, onToggleWi
   );
 };
 
-const OrderInvoicePrint = ({ order }: { order: any }) => {
+const OrderPrintModal = ({ 
+  order, 
+  onClose 
+}: { 
+  order: any; 
+  onClose: () => void;
+}) => {
   if (!order) return null;
 
   const parsedItems: any[] = typeof order.items === 'string' 
@@ -515,7 +523,6 @@ const OrderInvoicePrint = ({ order }: { order: any }) => {
   const discountAmount = order.discount_amount ?? order.discount ?? 0;
   const totalAmount = order.total_amount ?? order.totalAmount ?? (subtotal + deliveryCharge - advancePayment - discountAmount);
 
-  // Combine items for item column & sizes column matching image.png
   const itemNames = parsedItems.map(i => `${i.name || ''}`).filter(Boolean).join(', ') || 'Formal Wear';
   const itemSizes = parsedItems.map(i => i.selectedSize || '-').filter(Boolean).join(',') || '-';
   const totalQty = parsedItems.reduce((sum, i) => sum + Number(i.quantity || 1), 0);
@@ -528,8 +535,19 @@ const OrderInvoicePrint = ({ order }: { order: any }) => {
   const invoiceNum = String(order.id || '269102').replace(/\D/g, '').slice(-6) || '269102';
   const orderNum = invoiceNum.slice(-3) || '102';
 
-  const invoiceMarkup = (
-    <div id="printable-invoice-container" className="hidden print:block text-black bg-white font-sans p-3 max-w-[148mm] mx-auto text-xs leading-snug">
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      window.print();
+    }, 350);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const memoMarkup = (
+    <div className="text-black bg-white font-sans p-6 w-[148mm] min-h-[200mm] text-xs leading-snug">
       {/* Top Header */}
       <div className="flex justify-between items-start mb-1">
         <div>
@@ -538,7 +556,7 @@ const OrderInvoicePrint = ({ order }: { order: any }) => {
             MA VILLA, HOUSE-11, ROAD-3, BLOCK F,<br />
             MIRPUR-1, DHAKA-1216, BANGLADESH
           </p>
-          <p className="text-[11px] font-bold text-black mt-2">
+          <p className="text-[11px] font-bold text-black mt-1.5">
             Elegan BD Hotline Number : 01631496122
           </p>
         </div>
@@ -555,7 +573,6 @@ const OrderInvoicePrint = ({ order }: { order: any }) => {
 
       {/* Bill To & Invoice Meta Section */}
       <div className="flex justify-between items-start mb-3 pt-1">
-        {/* Bill To Left */}
         <div className="max-w-[55%]">
           <p className="font-bold underline text-xs text-black mb-1">Bill To</p>
           <p className="font-bold text-xs text-black">{order.customer_name || order.customerName || 'Md. Hasan Murad'}</p>
@@ -563,7 +580,6 @@ const OrderInvoicePrint = ({ order }: { order: any }) => {
           <p className="text-[11px] text-black leading-tight">{order.address || ''}</p>
         </div>
 
-        {/* Meta Right */}
         <div className="text-right space-y-0.5 text-xs">
           <div className="flex justify-end gap-3 font-bold">
             <span>Date:</span>
@@ -581,7 +597,6 @@ const OrderInvoicePrint = ({ order }: { order: any }) => {
             <span className="inline-block w-4 h-4 bg-emerald-600 text-white text-[9px] font-bold text-center leading-4 rounded-xs">✓</span>
             <span className="inline-block w-4 h-4 bg-emerald-600 text-white text-[9px] font-bold text-center leading-4 rounded-xs">✓</span>
           </div>
-          {/* Simulated Barcode */}
           <div className="pt-1 flex justify-end">
             <div className="h-6 w-28 bg-black flex items-center justify-around px-1 rounded-xs">
               {[...Array(22)].map((_, i) => (
@@ -592,7 +607,7 @@ const OrderInvoicePrint = ({ order }: { order: any }) => {
         </div>
       </div>
 
-      {/* Items Table Matching Image.png Exact Border Grid */}
+      {/* Items Table */}
       <div className="border-2 border-black rounded-xs mb-0 overflow-hidden">
         <table className="w-full text-left text-xs border-collapse">
           <thead>
@@ -621,7 +636,6 @@ const OrderInvoicePrint = ({ order }: { order: any }) => {
                 <td className="py-2 px-2 text-right font-bold">{subtotal}</td>
               </tr>
             )}
-            {/* Minimum empty table space filler to match image.png */}
             <tr className="h-28">
               <td className="border-r border-black" />
               <td className="border-r border-black" />
@@ -632,7 +646,7 @@ const OrderInvoicePrint = ({ order }: { order: any }) => {
         </table>
       </div>
 
-      {/* Bottom Financial Summary Grid attached right below table */}
+      {/* Bottom Financial Summary Grid */}
       <div className="flex justify-end mb-4">
         <div className="w-[50%] border-2 border-t-0 border-black text-xs font-bold divide-y divide-black border-black">
           <div className="flex justify-between py-1 px-2 text-black">
@@ -668,7 +682,7 @@ const OrderInvoicePrint = ({ order }: { order: any }) => {
         </p>
       </div>
 
-      {/* Footer Text centered */}
+      {/* Footer Text */}
       <div className="text-center space-y-1 pt-2 border-t border-black text-xs font-bold text-black">
         <p className="text-sm font-bold">3 Days Exchange & Return Available</p>
         <p className="text-xs font-medium">Thanks For Choosing Elegan BD</p>
@@ -676,7 +690,53 @@ const OrderInvoicePrint = ({ order }: { order: any }) => {
     </div>
   );
 
-  return createPortal(invoiceMarkup, document.body);
+  return (
+    <>
+      {/* On-Screen Modal Container */}
+      <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 overflow-y-auto">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden my-auto flex flex-col max-h-[95vh] border border-zinc-200">
+          {/* Modal Header */}
+          <div className="p-4 bg-zinc-900 text-white flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <Printer size={18} className="text-amber-400" />
+              <h3 className="text-sm font-bold uppercase tracking-wider">A5 Cash Memo Preview (ক্যাশ মেমো ফ্রিভিউ)</h3>
+            </div>
+            <div className="flex items-center gap-3">
+              <button 
+                type="button"
+                onClick={handlePrint}
+                className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-all flex items-center gap-2 shadow-md cursor-pointer"
+              >
+                <Printer size={15} /> Print Now (প্রিন্ট করুন)
+              </button>
+              <button 
+                type="button"
+                onClick={onClose} 
+                className="p-1.5 hover:bg-zinc-800 rounded-full text-zinc-300 hover:text-white transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+
+          {/* Scrollable Container containing the A5 Invoice Preview */}
+          <div className="p-6 bg-zinc-100 overflow-y-auto flex-1 flex justify-center">
+            <div className="shadow-lg border border-zinc-300 bg-white rounded-xs">
+              {memoMarkup}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Separate Top-Level Portal for @media print */}
+      {createPortal(
+        <div id="printable-invoice-container">
+          {memoMarkup}
+        </div>,
+        document.body
+      )}
+    </>
+  );
 };
 
 const OrderTrackingPage = ({ onBack, showToast, onPrintOrder }: { onBack: () => void, showToast: (msg: string, type?: 'success' | 'error' | 'info') => void, onPrintOrder?: (order: any) => void }) => {
@@ -4230,6 +4290,39 @@ const AdminPanel = ({
   });
   const [isUploading, setIsUploading] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+  // Manual Order Creation & Staff Management States
+  const [staffList, setStaffList] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('elegan_staff_list');
+      return saved ? JSON.parse(saved) : ['Shamiul', 'Sabbir', 'Rifat', 'Hasan', 'Mim'];
+    } catch {
+      return ['Shamiul', 'Sabbir', 'Rifat', 'Hasan', 'Mim'];
+    }
+  });
+
+  const [showAddOrderModal, setShowAddOrderModal] = useState(false);
+  const [showAddStaffInput, setShowAddStaffInput] = useState(false);
+  const [newStaffName, setNewStaffName] = useState('');
+
+  const [newOrderForm, setNewOrderForm] = useState({
+    customer_name: '',
+    phone: '',
+    address: '',
+    shipping_zone: 'Inside Dhaka',
+    advance_payment: 0,
+    discount_amount: 0,
+    payment_method: 'COD',
+    transaction_id: '',
+    invoiceBy: 'Shamiul',
+    note: '',
+    items: [] as any[]
+  });
+
+  const [selectedProductId, setSelectedProductId] = useState<string>('');
+  const [selectedSize, setSelectedSize] = useState<string>('');
+  const [selectedColor, setSelectedColor] = useState<string>('');
+  const [selectedQty, setSelectedQty] = useState<number>(1);
   const [heroVideo, setHeroVideo] = useState('https://assets.mixkit.co/videos/preview/mixkit-man-in-a-suit-walking-slowly-4848-large.mp4');
   const [heroImage, setHeroImage] = useState('https://i.imgur.com/Vriu71z.png');
   const [mobileHeroBannerForm, setMobileHeroBannerForm] = useState<Banner>({
@@ -4778,6 +4871,152 @@ const AdminPanel = ({
         setConfirmDialog({isOpen: false, message: '', onConfirm: () => {}});
       }
     });
+  };
+
+  const handleAddStaffName = () => {
+    const clean = newStaffName.trim();
+    if (!clean) return;
+    if (!staffList.includes(clean)) {
+      const updated = [...staffList, clean];
+      setStaffList(updated);
+      safeSetItem('elegan_staff_list', JSON.stringify(updated));
+      showToast(`Staff name added: ${clean}`, 'success');
+    }
+    setNewOrderForm(prev => ({ ...prev, invoiceBy: clean }));
+    setNewStaffName('');
+    setShowAddStaffInput(false);
+  };
+
+  const handleAddItemToOrder = () => {
+    if (!selectedProductId) {
+      showToast('Please select a product', 'error');
+      return;
+    }
+    const found = products.find(p => String(p.id) === String(selectedProductId));
+    if (!found) return;
+
+    const sizeVal = selectedSize || (found.sizes?.[0] ? (typeof found.sizes[0] === 'object' ? found.sizes[0].size : found.sizes[0]) : 'Free');
+    const colorVal = selectedColor || (found.colors?.[0] || '');
+
+    const newItem = {
+      id: found.id,
+      name: found.name,
+      price: found.price,
+      selectedSize: sizeVal,
+      selectedColor: colorVal,
+      quantity: Number(selectedQty) || 1
+    };
+
+    setNewOrderForm(prev => ({
+      ...prev,
+      items: [...prev.items, newItem]
+    }));
+
+    // Reset item pickers
+    setSelectedProductId('');
+    setSelectedSize('');
+    setSelectedColor('');
+    setSelectedQty(1);
+    showToast(`Added ${found.name} to order`, 'info');
+  };
+
+  const handleRemoveItemFromOrder = (index: number) => {
+    setNewOrderForm(prev => ({
+      ...prev,
+      items: prev.items.filter((_, idx) => idx !== index)
+    }));
+  };
+
+  const handleCreateNewOrder = async (shouldPrint: boolean = false) => {
+    if (!newOrderForm.customer_name.trim()) {
+      showToast('Customer name is required', 'error');
+      return;
+    }
+    if (!newOrderForm.phone.trim()) {
+      showToast('Customer phone number is required', 'error');
+      return;
+    }
+    if (!newOrderForm.address.trim()) {
+      showToast('Customer address is required', 'error');
+      return;
+    }
+    if (newOrderForm.items.length === 0) {
+      showToast('Please add at least one product item to the order', 'error');
+      return;
+    }
+
+    const subtotal = newOrderForm.items.reduce((acc, item) => acc + (Number(item.price || 0) * Number(item.quantity || 1)), 0);
+    const shipping = newOrderForm.shipping_zone === 'Inside Dhaka' ? 70 : 130;
+    const advance = Number(newOrderForm.advance_payment || 0);
+    const discount = Number(newOrderForm.discount_amount || 0);
+    const total = subtotal + shipping - advance - discount;
+
+    const generatedId = `26${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const orderData = {
+      id: generatedId,
+      customer_name: newOrderForm.customer_name.trim(),
+      phone: newOrderForm.phone.trim(),
+      address: newOrderForm.address.trim(),
+      shipping_zone: newOrderForm.shipping_zone,
+      shipping_cost: shipping,
+      subtotal: subtotal,
+      advance_payment: advance,
+      discount_amount: discount,
+      total_amount: total,
+      total: total,
+      items: JSON.stringify(newOrderForm.items),
+      payment_method: newOrderForm.payment_method,
+      transaction_id: newOrderForm.transaction_id || '',
+      invoiceBy: newOrderForm.invoiceBy || 'Shamiul',
+      note: newOrderForm.note || '',
+      status: 'Confirmed' as const,
+      created_at: new Date().toISOString()
+    };
+
+    try {
+      try {
+        const docRef = await addDoc(collection(db, 'orders'), orderData);
+        orderData.id = docRef.id;
+      } catch (fErr) {
+        console.warn('Firestore add order notice:', fErr);
+      }
+
+      await saveOrderToSupabase(orderData);
+
+      setOrders(prev => [orderData as any, ...prev]);
+
+      try {
+        const cached = JSON.parse(localStorage.getItem('elegan_orders') || '[]');
+        cached.unshift(orderData);
+        safeSetItem('elegan_orders', JSON.stringify(cached));
+      } catch (e) {}
+
+      showToast(`Order #${orderData.id} created successfully!`, 'success');
+      setShowAddOrderModal(false);
+
+      // Reset form
+      setNewOrderForm({
+        customer_name: '',
+        phone: '',
+        address: '',
+        shipping_zone: 'Inside Dhaka',
+        advance_payment: 0,
+        discount_amount: 0,
+        payment_method: 'COD',
+        transaction_id: '',
+        invoiceBy: staffList[0] || 'Shamiul',
+        note: '',
+        items: []
+      });
+
+      if (shouldPrint && onPrintOrder) {
+        onPrintOrder(orderData as any);
+      }
+    } catch (err: any) {
+      console.error('Create order error:', err);
+      showToast('Failed to create order', 'error');
+    }
   };
 
   const handleMasterStockChange = (productId: string | number, color: string, size: string, value: number) => {
@@ -6924,7 +7163,23 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
           )}
           {activeTab === 'orders' && (
             loading ? <p>Loading orders...</p> : (
-              <div className="bg-white rounded-xl shadow-sm border border-zinc-100 overflow-hidden">
+              <div>
+                {/* Orders Header Bar with Create Order Button */}
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
+                  <div>
+                    <h3 className="text-xl font-serif font-bold text-zinc-900">Order Management ({orders.length})</h3>
+                    <p className="text-xs text-zinc-500 mt-0.5">সব কাস্টমার অর্ডার দেখুন এবং স্টাফ সিলেক্ট করে নতুন ম্যানুয়াল ইনভয়েস তৈরি করুন</p>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => setShowAddOrderModal(true)}
+                    className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                  >
+                    <Plus size={16} /> Create Order / ইনভয়েস এন্ট্রি
+                  </button>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-zinc-100 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
@@ -7017,8 +7272,331 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
                   </table>
                 </div>
               </div>
-            )
-          )}
+            </div>
+          )
+        )}
+
+          {/* Create Order Modal */}
+          <AnimatePresence>
+            {showAddOrderModal && (
+              <>
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowAddOrderModal(false)}
+                  className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[80]"
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                  className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl bg-white z-[90] shadow-2xl rounded-2xl overflow-hidden max-h-[92vh] flex flex-col border border-zinc-200 text-zinc-900"
+                >
+                  {/* Header */}
+                  <div className="p-5 border-b border-zinc-100 flex justify-between items-center bg-zinc-900 text-white">
+                    <div className="flex items-center gap-2.5">
+                      <PlusCircle size={20} className="text-amber-400" />
+                      <div>
+                        <h2 className="text-base font-bold uppercase tracking-wider">Create New Order (ম্যানুয়াল ইনভয়েস এন্ট্রি)</h2>
+                        <p className="text-[11px] text-zinc-400 mt-0.5">নতুন কাস্টমার বা ফোন/সোশ্যাল মিডিয়া অর্ডারের জন্য ইনভয়েস তৈরি করুন</p>
+                      </div>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => setShowAddOrderModal(false)} 
+                      className="p-1.5 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                    >
+                      <X size={22} />
+                    </button>
+                  </div>
+
+                  {/* Body */}
+                  <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                    {/* Invoice By (Staff Name) with + Icon Button */}
+                    <div className="bg-amber-50/70 p-4 rounded-xl border border-amber-200/80">
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                          <UserPlus size={15} className="text-amber-600" />
+                          Invoice Created By (ইনভয়েস এন্ট্রি স্টাফের নাম) *
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setShowAddStaffInput(!showAddStaffInput)}
+                          className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1 cursor-pointer shadow-xs"
+                          title="নতুন স্টাফের নাম যুক্ত করুন"
+                        >
+                          <Plus size={14} /> Add New Staff
+                        </button>
+                      </div>
+
+                      {showAddStaffInput ? (
+                        <div className="flex gap-2 mt-2">
+                          <input 
+                            type="text"
+                            placeholder="যেমন: Shamiul, Sabbir, Tanvir..."
+                            value={newStaffName}
+                            onChange={(e) => setNewStaffName(e.target.value)}
+                            className="flex-1 bg-white border border-amber-300 px-3 py-2 text-xs font-bold rounded-lg outline-none focus:ring-2 focus:ring-amber-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddStaffName}
+                            className="px-4 py-2 bg-zinc-900 text-white text-xs font-bold uppercase rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowAddStaffInput(false)}
+                            className="px-3 py-2 border border-zinc-300 text-zinc-600 text-xs font-bold uppercase rounded-lg hover:bg-zinc-100 cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <select
+                          value={newOrderForm.invoiceBy}
+                          onChange={(e) => setNewOrderForm(prev => ({ ...prev, invoiceBy: e.target.value }))}
+                          className="w-full bg-white border border-amber-300 px-3 py-2 text-xs font-bold rounded-lg outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                        >
+                          {staffList.map((staff, idx) => (
+                            <option key={idx} value={staff}>{staff}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+
+                    {/* Customer Info */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Customer Name (গ্রাহকের নাম) *</label>
+                        <input 
+                          type="text"
+                          placeholder="Md. Hasan Murad"
+                          value={newOrderForm.customer_name}
+                          onChange={(e) => setNewOrderForm(prev => ({ ...prev, customer_name: e.target.value }))}
+                          className="w-full border border-zinc-200 px-3 py-2 text-xs font-medium rounded-lg outline-none focus:border-zinc-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Phone Number (মোবাইল নম্বর) *</label>
+                        <input 
+                          type="text"
+                          placeholder="01711977415"
+                          value={newOrderForm.phone}
+                          onChange={(e) => setNewOrderForm(prev => ({ ...prev, phone: e.target.value }))}
+                          className="w-full border border-zinc-200 px-3 py-2 text-xs font-bold font-mono rounded-lg outline-none focus:border-zinc-900"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Delivery Address (ঠিকানা) *</label>
+                        <textarea 
+                          rows={2}
+                          placeholder="Plot -50, Gazipura 27 Bus stand, Tongi, Gazipur."
+                          value={newOrderForm.address}
+                          onChange={(e) => setNewOrderForm(prev => ({ ...prev, address: e.target.value }))}
+                          className="w-full border border-zinc-200 px-3 py-2 text-xs font-medium rounded-lg outline-none focus:border-zinc-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Delivery Zone (ডেলিভারি এরিয়া)</label>
+                        <select
+                          value={newOrderForm.shipping_zone}
+                          onChange={(e) => setNewOrderForm(prev => ({ ...prev, shipping_zone: e.target.value }))}
+                          className="w-full border border-zinc-200 px-3 py-2 text-xs font-bold rounded-lg outline-none focus:border-zinc-900 cursor-pointer"
+                        >
+                          <option value="Inside Dhaka">Inside Dhaka (৳70)</option>
+                          <option value="Outside Dhaka">Outside Dhaka (৳130)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Payment Method</label>
+                        <select
+                          value={newOrderForm.payment_method}
+                          onChange={(e) => setNewOrderForm(prev => ({ ...prev, payment_method: e.target.value }))}
+                          className="w-full border border-zinc-200 px-3 py-2 text-xs font-bold rounded-lg outline-none focus:border-zinc-900 cursor-pointer"
+                        >
+                          <option value="COD">Cash on Delivery (COD)</option>
+                          <option value="bKash">bKash Personal / Merchant</option>
+                          <option value="Nagad">Nagad Personal / Merchant</option>
+                          <option value="Bank">Bank Transfer</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Product Selection */}
+                    <div className="border border-zinc-200 p-4 rounded-xl bg-zinc-50 space-y-3">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-zinc-700">Add Products to Invoice (পণ্য সিলেক্ট করুন)</label>
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                        <div className="sm:col-span-2">
+                          <select
+                            value={selectedProductId}
+                            onChange={(e) => {
+                              const pId = e.target.value;
+                              setSelectedProductId(pId);
+                              const foundProd = products.find(prod => String(prod.id) === String(pId));
+                              if (foundProd) {
+                                setSelectedSize(foundProd.sizes?.[0] ? (typeof foundProd.sizes[0] === 'object' ? foundProd.sizes[0].size : foundProd.sizes[0]) : '');
+                                setSelectedColor(foundProd.colors?.[0] || '');
+                              }
+                            }}
+                            className="w-full bg-white border border-zinc-300 px-3 py-2 text-xs font-bold rounded-lg outline-none focus:border-zinc-900 cursor-pointer"
+                          >
+                            <option value="">-- Select Product --</option>
+                            {products.map(p => (
+                              <option key={p.id} value={p.id}>{p.name} (৳{p.price})</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <input 
+                            type="text" 
+                            placeholder="Size (Size 28,30)" 
+                            value={selectedSize}
+                            onChange={(e) => setSelectedSize(e.target.value)}
+                            className="w-full bg-white border border-zinc-300 px-3 py-2 text-xs font-bold rounded-lg outline-none focus:border-zinc-900"
+                          />
+                        </div>
+                        <div>
+                          <div className="flex gap-2">
+                            <input 
+                              type="number" 
+                              min="1"
+                              placeholder="Qty" 
+                              value={selectedQty}
+                              onChange={(e) => setSelectedQty(Math.max(1, parseInt(e.target.value) || 1))}
+                              className="w-16 bg-white border border-zinc-300 px-2 py-2 text-xs font-bold rounded-lg outline-none text-center"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleAddItemToOrder}
+                              className="flex-1 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold uppercase rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1"
+                            >
+                              <Plus size={14} /> Add
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Items List Table */}
+                      {newOrderForm.items.length > 0 && (
+                        <div className="mt-3 border border-zinc-200 rounded-lg overflow-hidden bg-white">
+                          <table className="w-full text-left text-xs border-collapse">
+                            <thead>
+                              <tr className="bg-zinc-100 text-zinc-500 font-bold uppercase text-[10px] tracking-wider border-b border-zinc-200">
+                                <th className="p-2">Item</th>
+                                <th className="p-2 text-center">Size</th>
+                                <th className="p-2 text-center">Qty</th>
+                                <th className="p-2 text-right">Price</th>
+                                <th className="p-2 text-right">Total</th>
+                                <th className="p-2 text-center">Action</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-100">
+                              {newOrderForm.items.map((item, idx) => (
+                                <tr key={idx} className="hover:bg-zinc-50">
+                                  <td className="p-2 font-bold text-zinc-900">{item.name}</td>
+                                  <td className="p-2 text-center text-zinc-600">{item.selectedSize}</td>
+                                  <td className="p-2 text-center font-bold text-zinc-900">{item.quantity}</td>
+                                  <td className="p-2 text-right text-zinc-600">৳{item.price}</td>
+                                  <td className="p-2 text-right font-bold text-zinc-900">৳{item.price * item.quantity}</td>
+                                  <td className="p-2 text-center">
+                                    <button 
+                                      type="button" 
+                                      onClick={() => handleRemoveItemFromOrder(idx)}
+                                      className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 cursor-pointer"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Financial Calculations */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-zinc-50 p-4 rounded-xl border border-zinc-200">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Sub Total</label>
+                        <p className="text-sm font-bold text-zinc-900 mt-1">
+                          ৳{newOrderForm.items.reduce((acc, item) => acc + (Number(item.price || 0) * Number(item.quantity || 1)), 0)}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Delivery Charge</label>
+                        <p className="text-sm font-bold text-zinc-900 mt-1">
+                          ৳{newOrderForm.shipping_zone === 'Inside Dhaka' ? 70 : 130}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Advance Payment (৳)</label>
+                        <input 
+                          type="number"
+                          placeholder="0"
+                          value={newOrderForm.advance_payment || ''}
+                          onChange={(e) => setNewOrderForm(prev => ({ ...prev, advance_payment: parseFloat(e.target.value) || 0 }))}
+                          className="w-full bg-white border border-zinc-300 px-2 py-1.5 text-xs font-bold rounded outline-none focus:border-zinc-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Discount (৳)</label>
+                        <input 
+                          type="number"
+                          placeholder="0"
+                          value={newOrderForm.discount_amount || ''}
+                          onChange={(e) => setNewOrderForm(prev => ({ ...prev, discount_amount: parseFloat(e.target.value) || 0 }))}
+                          className="w-full bg-white border border-zinc-300 px-2 py-1.5 text-xs font-bold rounded outline-none focus:border-zinc-900"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Note */}
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Order Note (বিশেষ নির্দেশাবলী)</label>
+                      <input 
+                        type="text"
+                        placeholder="যেমন: বিকাল ৫ টার আগে ডেলিভারি প্রয়োজন"
+                        value={newOrderForm.note}
+                        onChange={(e) => setNewOrderForm(prev => ({ ...prev, note: e.target.value }))}
+                        className="w-full border border-zinc-200 px-3 py-2 text-xs font-medium rounded-lg outline-none focus:border-zinc-900"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="p-4 border-t border-zinc-100 bg-zinc-50 flex justify-between items-center gap-3">
+                    <button 
+                      type="button"
+                      onClick={() => setShowAddOrderModal(false)}
+                      className="px-5 py-2.5 border border-zinc-300 text-zinc-700 text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-zinc-100 transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <div className="flex gap-2">
+                      <button 
+                        type="button"
+                        onClick={() => handleCreateNewOrder(false)}
+                        className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-900 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
+                      >
+                        Save Order Only
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => handleCreateNewOrder(true)}
+                        className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                      >
+                        <Printer size={15} /> Save & Print A5 Memo
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
 
           {/* Order Details Modal */}
           <AnimatePresence>
@@ -9955,8 +10533,13 @@ export default function App() {
         onNavigate={handleNavigate}
       />
 
-      {/* Hidden Printable Invoice for window.print() */}
-      <OrderInvoicePrint order={printableOrder} />
+      {/* On-Screen A5 Cash Memo Preview Modal & Printable Document */}
+      {printableOrder && (
+        <OrderPrintModal 
+          order={printableOrder} 
+          onClose={() => setPrintableOrder(null)} 
+        />
+      )}
     </div>
   );
 }
