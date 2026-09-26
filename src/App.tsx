@@ -59,7 +59,9 @@ import {
   DollarSign,
   ArrowUpRight,
   Edit2,
-  Smartphone
+  Smartphone,
+  Printer,
+  FileText
 } from 'lucide-react';
 import { 
   supabase, 
@@ -98,6 +100,23 @@ let firestoreQuotaExceeded = false;
 if (typeof window !== 'undefined') {
   localStorage.removeItem('elegan_firestore_quota_exceeded');
 }
+
+const safeSetItem = (key: string, value: string) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(key, value);
+  } catch (err) {
+    console.warn(`localStorage setItem quota notice for "${key}":`, err);
+    try {
+      if (key === 'elegan_cart') {
+        localStorage.removeItem('elegan_customer_reviews_v2');
+      }
+      localStorage.setItem(key, value);
+    } catch (retryErr) {
+      // Graceful fallback when quota exceeded
+    }
+  }
+};
 
 const handleFirestoreError = (err: any, actionName: string) => {
   console.warn(`Firestore ${actionName} notice:`, err?.message || err);
@@ -482,7 +501,148 @@ const WishlistPage = ({ user, products, onSelect, onBack, onNavigate, onToggleWi
   );
 };
 
-const OrderTrackingPage = ({ onBack, showToast }: { onBack: () => void, showToast: (msg: string, type?: 'success' | 'error' | 'info') => void }) => {
+const OrderInvoicePrint = ({ order }: { order: any }) => {
+  if (!order) return null;
+
+  const parsedItems: any[] = typeof order.items === 'string' 
+    ? (() => { try { return JSON.parse(order.items); } catch { return []; } })() 
+    : (Array.isArray(order.items) ? order.items : []);
+
+  const subtotal = order.subtotal || parsedItems.reduce((acc, item) => acc + (Number(item.price || 0) * Number(item.quantity || 1)), 0);
+  const shippingCost = order.shipping_cost ?? order.shippingCost ?? order.shipping ?? (order.shipping_zone === 'Inside Dhaka' ? 70 : 130);
+  const discountAmount = order.discount_amount ?? order.discount ?? 0;
+  const grandTotal = order.total_amount ?? order.totalAmount ?? order.total ?? (subtotal + shippingCost - discountAmount);
+
+  const orderDate = (order.created_at || order.createdAt) 
+    ? new Date(order.created_at || order.createdAt).toLocaleString('en-BD', {
+        dateStyle: 'medium',
+        timeStyle: 'short'
+      }) 
+    : new Date().toLocaleDateString();
+
+  return (
+    <div id="printable-invoice" className="hidden print:block p-8 bg-white text-zinc-900 font-sans max-w-3xl mx-auto border border-zinc-300 rounded-lg shadow-none">
+      {/* Header / Brand Logo */}
+      <div className="flex justify-between items-start pb-6 border-b-2 border-zinc-900 mb-6">
+        <div>
+          <h1 className="text-3xl font-serif font-black tracking-tight text-zinc-900 uppercase">ELEGAN</h1>
+          <p className="text-xs font-bold uppercase tracking-widest text-zinc-700">Premium Formal & Office Wear</p>
+          <p className="text-[11px] text-zinc-600 mt-1">Dhaka, Bangladesh | Hotline: +880 1700-000000</p>
+          <p className="text-[11px] text-zinc-600">Website: www.elegan.com | Email: support@elegan.com</p>
+        </div>
+        <div className="text-right">
+          <div className="bg-zinc-900 text-white px-3 py-1 text-xs font-bold uppercase tracking-widest inline-block rounded mb-2">
+            CASH MEMO / INVOICE
+          </div>
+          <p className="text-sm font-mono font-bold text-zinc-900">#ORD-{order.id}</p>
+          <p className="text-xs text-zinc-600 mt-1">Date: {orderDate}</p>
+        </div>
+      </div>
+
+      {/* Customer & Order Metadata */}
+      <div className="grid grid-cols-2 gap-6 p-4 bg-zinc-50 rounded-xl border border-zinc-200 mb-6">
+        <div>
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-2">Customer Details (গ্রাহকের তথ্য)</h3>
+          <p className="text-sm font-bold text-zinc-900">{order.customer_name || order.customerName || 'N/A'}</p>
+          <p className="text-sm font-bold font-mono text-zinc-900 my-1">{order.phone || 'N/A'}</p>
+          <p className="text-xs text-zinc-700 leading-relaxed">{order.address || 'N/A'}</p>
+          <p className="text-[11px] font-bold text-zinc-600 mt-1">Zone: {order.shipping_zone || order.district || 'Standard Delivery'}</p>
+        </div>
+        <div className="text-right">
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-2">Order Meta</h3>
+          <p className="text-xs text-zinc-600">Payment Method: <span className="font-bold text-zinc-900 uppercase">{order.payment_method || order.paymentMethod || 'COD'}</span></p>
+          {(order.transaction_id || order.transactionId) && (
+            <p className="text-xs text-zinc-600">TXID: <span className="font-mono font-bold text-zinc-900">{order.transaction_id || order.transactionId}</span></p>
+          )}
+          <p className="text-xs text-zinc-600 mt-1">Status: <span className="font-bold text-zinc-900 uppercase">{order.status || 'Pending'}</span></p>
+        </div>
+      </div>
+
+      {/* Itemized Table */}
+      <table className="w-full text-left text-xs mb-6 border-collapse">
+        <thead>
+          <tr className="bg-zinc-900 text-white uppercase font-bold text-[10px] tracking-wider">
+            <th className="py-2.5 px-3 rounded-l">#</th>
+            <th className="py-2.5 px-3">Item Description</th>
+            <th className="py-2.5 px-3">Size</th>
+            <th className="py-2.5 px-3">Color</th>
+            <th className="py-2.5 px-3 text-center">Qty</th>
+            <th className="py-2.5 px-3 text-right">Price</th>
+            <th className="py-2.5 px-3 text-right rounded-r">Total</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-200">
+          {parsedItems.map((item: any, idx: number) => (
+            <tr key={idx} className="text-zinc-800">
+              <td className="py-2.5 px-3 font-mono text-zinc-400">{idx + 1}</td>
+              <td className="py-2.5 px-3 font-bold text-zinc-900">{item.name}</td>
+              <td className="py-2.5 px-3 font-medium">{item.selectedSize || '-'}</td>
+              <td className="py-2.5 px-3 font-medium">{item.selectedColor || '-'}</td>
+              <td className="py-2.5 px-3 text-center font-bold">{item.quantity}</td>
+              <td className="py-2.5 px-3 text-right">৳{item.price}</td>
+              <td className="py-2.5 px-3 text-right font-bold">৳{item.price * item.quantity}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Financial Summary */}
+      <div className="flex justify-between items-start pt-4 border-t border-zinc-200 mb-8">
+        <div className="text-xs text-zinc-500 space-y-1">
+          <p className="font-bold text-zinc-800">Thank you for shopping with ELEGAN!</p>
+          <p>For return or exchange, please keep this memo intact.</p>
+          <p>Contact us within 3 days for any order query.</p>
+        </div>
+        <div className="w-64 space-y-2 text-xs">
+          <div className="flex justify-between text-zinc-600">
+            <span>Subtotal:</span>
+            <span className="font-medium">৳{subtotal}</span>
+          </div>
+          <div className="flex justify-between text-zinc-600">
+            <span>Delivery Charge:</span>
+            <span className="font-medium">৳{shippingCost}</span>
+          </div>
+          {discountAmount > 0 && (
+            <div className="flex justify-between text-emerald-600 font-bold">
+              <span>Discount:</span>
+              <span>-৳{discountAmount}</span>
+            </div>
+          )}
+          <div className="flex justify-between pt-2 border-t-2 border-zinc-900 font-bold text-sm text-zinc-900">
+            <span>Payable Amount:</span>
+            <span>৳{grandTotal}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Courier Shipping Label Cut Slip */}
+      <div className="pt-6 border-t-2 border-dashed border-zinc-400 text-xs">
+        <div className="flex justify-between items-center text-[10px] text-zinc-400 uppercase tracking-widest font-bold mb-3">
+          <span>✂️ CUT HERE FOR PARCEL LABEL / COURIER SLIP</span>
+          <span>ELEGAN LOGISTICS</span>
+        </div>
+        <div className="p-4 border-2 border-zinc-900 rounded-lg bg-zinc-50 grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase text-zinc-400">Recipient (প্রাপক)</p>
+            <p className="text-sm font-bold text-zinc-900">{order.customer_name || order.customerName}</p>
+            <p className="text-sm font-bold font-mono text-zinc-900 my-0.5">{order.phone}</p>
+            <p className="text-xs text-zinc-800">{order.address}</p>
+          </div>
+          <div className="text-right border-l border-zinc-200 pl-4">
+            <p className="text-[10px] font-bold uppercase text-zinc-400">Order Ref</p>
+            <p className="text-sm font-mono font-bold text-zinc-900">#ORD-{order.id}</p>
+            <div className="mt-2 inline-block bg-zinc-900 text-white p-2 rounded text-center">
+              <p className="text-[9px] uppercase tracking-widest font-bold text-zinc-300">Collect Cash (COD)</p>
+              <p className="text-lg font-bold">৳{grandTotal}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const OrderTrackingPage = ({ onBack, showToast, onPrintOrder }: { onBack: () => void, showToast: (msg: string, type?: 'success' | 'error' | 'info') => void, onPrintOrder?: (order: any) => void }) => {
   const [orderId, setOrderId] = useState('');
   const [trackingOrder, setTrackingOrder] = useState<any>(null);
   const [searching, setSearching] = useState(false);
@@ -605,11 +765,20 @@ const OrderTrackingPage = ({ onBack, showToast }: { onBack: () => void, showToas
                 {trackingOrder.status === 'Delivered' && <CheckCircle2 size={24} className="text-green-500" />}
               </div>
             </div>
-            <div className="text-right flex flex-col items-end">
-              <p className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-1">Estimated Delivery</p>
+            <div className="text-right flex flex-col items-end gap-2">
+              <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">Estimated Delivery</p>
               <p className="text-lg font-bold text-zinc-900">
                 {trackingOrder.status === 'Delivered' ? 'Delivered successfully' : '2-3 Business Days'}
               </p>
+              {onPrintOrder && (
+                <button
+                  type="button"
+                  onClick={() => onPrintOrder(trackingOrder)}
+                  className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs mt-1"
+                >
+                  <Printer size={14} /> Print Invoice
+                </button>
+              )}
             </div>
           </div>
 
@@ -2660,10 +2829,7 @@ const ProductDetails = ({ product, products, onAddToCart, onBack, onBuyNow, user
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
               {parseProductSizes(product.sizes, product.category, product.name).map(size => {
                 let isOutOfStock = false;
-                if (product.stockMap && Object.keys(product.stockMap).length > 0) {
-                  const sizeStock = Object.values(product.stockMap).reduce((sum: number, colStock: any) => sum + (colStock?.[size] || 0), 0);
-                  if (sizeStock <= 0) isOutOfStock = true;
-                } else if (product.stock !== undefined && product.stock <= 0) {
+                if (product.stockStatus === 'Out of Stock') {
                   isOutOfStock = true;
                 }
 
@@ -2847,9 +3013,7 @@ const CartDrawer = ({ isOpen, onClose, items, onUpdateQty, onRemove, onCheckout 
                       </div>
 
                       {/* Stock Status Indicator */}
-                      {(item.stockMap && item.selectedColor && item.selectedSize ? 
-                        (item.stockMap[item.selectedColor]?.[item.selectedSize] || 0) <= 0 : 
-                        (item.stock || 0) <= 0) && (
+                      {item.stockStatus === 'Out of Stock' && (
                         <div className="flex items-center gap-1.5 mt-2">
                           <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                           <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Stock Out</span>
@@ -3054,13 +3218,13 @@ const CheckoutPage = ({
         const storedOrderIds = JSON.parse(localStorage.getItem('elegan_user_order_ids') || '[]');
         if (!storedOrderIds.includes(docRef.id)) {
           storedOrderIds.unshift(docRef.id);
-          localStorage.setItem('elegan_user_order_ids', JSON.stringify(storedOrderIds));
+          safeSetItem('elegan_user_order_ids', JSON.stringify(storedOrderIds));
         }
-        localStorage.setItem('elegan_last_phone', formData.phone);
+        safeSetItem('elegan_last_phone', formData.phone);
 
         const cachedOrders = JSON.parse(localStorage.getItem('elegan_orders') || '[]');
         cachedOrders.unshift({ id: docRef.id, ...orderData });
-        localStorage.setItem('elegan_orders', JSON.stringify(cachedOrders));
+        safeSetItem('elegan_orders', JSON.stringify(cachedOrders));
       } catch (e) {}
 
       onComplete(docRef.id);
@@ -3224,9 +3388,7 @@ const CheckoutPage = ({
                       </div>
 
                       {/* Stock warning */}
-                      {(item.stockMap && item.selectedColor && item.selectedSize ? 
-                        (item.stockMap[item.selectedColor]?.[item.selectedSize] || 0) <= 0 : 
-                        (item.stock || 0) <= 0) && (
+                      {item.stockStatus === 'Out of Stock' && (
                         <div className="flex items-center gap-1.5 mt-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                           <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">Stock Out</span>
@@ -3959,7 +4121,8 @@ const AdminPanel = ({
   mobileBannerConfig,
   setMobileBannerConfig,
   showToast,
-  initialProducts
+  initialProducts,
+  onPrintOrder
 }: { 
   onBack: () => void, 
   onRefreshProducts: () => void, 
@@ -3973,7 +4136,8 @@ const AdminPanel = ({
   mobileBannerConfig?: { ratio?: 'auto' | '16/9' | '2/1' | '4/3' | '1/1' | '4/5' | '8/9', fit?: 'contain' | 'cover', height?: number },
   setMobileBannerConfig?: React.Dispatch<React.SetStateAction<any>>,
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void,
-  initialProducts?: Product[]
+  initialProducts?: Product[],
+  onPrintOrder?: (order: Order) => void
 }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>(() => {
@@ -4106,7 +4270,7 @@ const AdminPanel = ({
         const parsed = JSON.parse(docSnap.data().value);
         if (Array.isArray(parsed)) {
           setCategories(parsed);
-          localStorage.setItem('elegan_product_categories', JSON.stringify(parsed));
+          safeSetItem('elegan_product_categories', JSON.stringify(parsed));
           return parsed;
         }
       } else {
@@ -4119,7 +4283,7 @@ const AdminPanel = ({
           } catch (e) {}
         }
         setCategories(initialList);
-        localStorage.setItem('elegan_product_categories', JSON.stringify(initialList));
+        safeSetItem('elegan_product_categories', JSON.stringify(initialList));
         await setDoc(doc(db, 'settings', 'product_categories'), { value: JSON.stringify(initialList) });
         return initialList;
       }
@@ -4144,7 +4308,7 @@ const AdminPanel = ({
     }
     const updated = [...categories, trimmed];
     setCategories(updated);
-    localStorage.setItem('elegan_product_categories', JSON.stringify(updated));
+    safeSetItem('elegan_product_categories', JSON.stringify(updated));
     showToast(`ক্যাটাগরি "${trimmed}" যুক্ত করা হয়েছে`, 'success');
     try {
       await setDoc(doc(db, 'settings', 'product_categories'), { value: JSON.stringify(updated) });
@@ -4157,7 +4321,7 @@ const AdminPanel = ({
   const handleDeleteCategory = async (catToDelete: string) => {
     const updated = categories.filter(c => c !== catToDelete);
     setCategories(updated);
-    localStorage.setItem('elegan_product_categories', JSON.stringify(updated));
+    safeSetItem('elegan_product_categories', JSON.stringify(updated));
     showToast(`ক্যাটাগরি "${catToDelete}" মুছে ফেলা হয়েছে`, 'info');
     try {
       await setDoc(doc(db, 'settings', 'product_categories'), { value: JSON.stringify(updated) });
@@ -4953,8 +5117,8 @@ const AdminPanel = ({
     pColors.forEach(c => {
       if (!baseMap[c]) baseMap[c] = {};
       pSizes.forEach(s => {
-        if (typeof baseMap[c][s] !== 'number') {
-          baseMap[c][s] = 0;
+        if (typeof baseMap[c][s] !== 'number' || baseMap[c][s] <= 0) {
+          baseMap[c][s] = 20;
         }
       });
     });
@@ -5631,12 +5795,12 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
       const supaAccs = await fetchFinanceAccountsFromSupabase();
       if (supaAccs && supaAccs.length > 0) {
         setAccounts(supaAccs);
-        localStorage.setItem('elegan_finance_accounts', JSON.stringify(supaAccs));
+        safeSetItem('elegan_finance_accounts', JSON.stringify(supaAccs));
       }
       const supaTxs = await fetchFinanceTransactionsFromSupabase();
       if (supaTxs) {
         setTransactions(supaTxs);
-        localStorage.setItem('elegan_finance_transactions', JSON.stringify(supaTxs));
+        safeSetItem('elegan_finance_transactions', JSON.stringify(supaTxs));
       }
     }
     loadFromSupabase();
@@ -5645,14 +5809,14 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
   // Save Accounts helper
   const updateAccountsState = (newAccs: any[]) => {
     setAccounts(newAccs);
-    localStorage.setItem('elegan_finance_accounts', JSON.stringify(newAccs));
+    safeSetItem('elegan_finance_accounts', JSON.stringify(newAccs));
     saveFinanceAccountsToSupabase(newAccs);
   };
 
   // Save Transactions helper
   const updateTransactionsState = (newTxs: any[], newTxToSave?: any) => {
     setTransactions(newTxs);
-    localStorage.setItem('elegan_finance_transactions', JSON.stringify(newTxs));
+    safeSetItem('elegan_finance_transactions', JSON.stringify(newTxs));
     if (newTxToSave) {
       saveFinanceTransactionToSupabase(newTxToSave);
     }
@@ -6784,15 +6948,26 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
                                 <option value="Cancelled">Cancelled</option>
                               </select>
                               <button 
+                                onClick={() => {
+                                  setSelectedOrder(order);
+                                  if (onPrintOrder) onPrintOrder(order);
+                                  else window.print();
+                                }}
+                                className="px-2.5 py-1 bg-zinc-900 text-white hover:bg-zinc-800 text-[10px] font-bold uppercase tracking-wider rounded transition-colors flex items-center gap-1 cursor-pointer"
+                                title="Print Cash Memo / Invoice"
+                              >
+                                <Printer size={13} /> Memo
+                              </button>
+                              <button 
                                 onClick={() => setSelectedOrder(order)}
-                                className="p-2 text-zinc-400 hover:text-zinc-900 transition-colors"
+                                className="p-2 text-zinc-400 hover:text-zinc-900 transition-colors cursor-pointer"
                                 title="View Details"
                               >
                                 <Eye size={16} />
                               </button>
                               <button 
                                 onClick={() => deleteOrder(order.id!)}
-                                className="p-2 text-zinc-400 hover:text-red-500 transition-colors"
+                                className="p-2 text-zinc-400 hover:text-red-500 transition-colors cursor-pointer"
                                 title="Delete Order"
                               >
                                 <Trash2 size={16} />
@@ -6913,16 +7088,27 @@ const FinanceManager = ({ showToast }: { showToast: (msg: string, type?: 'succes
                         deleteOrder(selectedOrder.id!);
                         setSelectedOrder(null);
                       }}
-                      className="px-6 py-3 border border-red-100 text-red-600 hover:bg-red-50 text-xs font-bold uppercase tracking-widest rounded-lg transition-colors flex items-center gap-2"
+                      className="px-4 py-2.5 border border-red-100 text-red-600 hover:bg-red-50 text-xs font-bold uppercase tracking-widest rounded-lg transition-colors flex items-center gap-2 cursor-pointer"
                     >
-                      <Trash2 size={16} /> Delete Order
+                      <Trash2 size={16} /> Delete
                     </button>
-                    <button 
-                      onClick={() => setSelectedOrder(null)}
-                      className="px-8 py-3 bg-zinc-900 text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-zinc-800 transition-colors"
-                    >
-                      Close
-                    </button>
+                    <div className="flex gap-3">
+                      <button 
+                        onClick={() => {
+                          if (onPrintOrder) onPrintOrder(selectedOrder);
+                          else window.print();
+                        }}
+                        className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold uppercase tracking-widest rounded-lg transition-colors flex items-center gap-2 cursor-pointer shadow-sm"
+                      >
+                        <Printer size={16} /> Print Memo / Invoice
+                      </button>
+                      <button 
+                        onClick={() => setSelectedOrder(null)}
+                        className="px-6 py-2.5 bg-zinc-900 text-white text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
+                      >
+                        Close
+                      </button>
+                    </div>
                   </div>
                 </motion.div>
               </>
@@ -8549,6 +8735,7 @@ export default function App() {
   const [isUserOpen, setIsUserOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [orderSuccess, setOrderSuccess] = useState(false);
+  const [printableOrder, setPrintableOrder] = useState<Order | null>(null);
 
   const handleToggleWishlist = async (e: React.MouseEvent, product: Product) => {
     e.stopPropagation();
@@ -8573,7 +8760,7 @@ export default function App() {
 
     const updatedUser = { ...user, wishlist: newWishlist };
     setUser(updatedUser);
-    localStorage.setItem('elegan_user', JSON.stringify(updatedUser));
+    safeSetItem('elegan_user', JSON.stringify(updatedUser));
 
     try {
       const q = query(collection(db, 'users'), where('email', '==', user.email));
@@ -8831,16 +9018,30 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('elegan_cart', JSON.stringify(cart));
+    try {
+      const compactCart = cart.map(item => ({
+        ...item,
+        image: (item.image && item.image.startsWith('data:image/') && item.image.length > 500) ? '' : item.image,
+        images: undefined,
+        stockMap: undefined
+      }));
+      safeSetItem('elegan_cart', JSON.stringify(compactCart));
+    } catch (e) {
+      console.warn('Cart localStorage save notice:', e);
+    }
   }, [cart]);
 
   useEffect(() => {
-    localStorage.setItem('elegan_page', currentPage);
+    try {
+      safeSetItem('elegan_page', currentPage);
+    } catch (e) {}
   }, [currentPage]);
 
   const handleLoginSuccess = (userData: User) => {
     setUser(userData);
-    localStorage.setItem('elegan_user', JSON.stringify(userData));
+    try {
+      safeSetItem('elegan_user', JSON.stringify(userData));
+    } catch (e) {}
   };
 
   const handleLogout = () => {
@@ -9355,6 +9556,10 @@ export default function App() {
           <OrderTrackingPage 
             onBack={() => handleNavigate('home')}
             showToast={showToast}
+            onPrintOrder={(ord) => {
+              setPrintableOrder(ord);
+              setTimeout(() => window.print(), 150);
+            }}
           />
         )}
 
@@ -9377,6 +9582,10 @@ export default function App() {
             setMobileBannerConfig={setMobileBannerConfig}
             showToast={showToast}
             initialProducts={products}
+            onPrintOrder={(ord) => {
+              setPrintableOrder(ord);
+              setTimeout(() => window.print(), 150);
+            }}
           />
         )}
 
@@ -9433,8 +9642,29 @@ export default function App() {
                 <motion.button 
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    try {
+                      const cachedOrders = JSON.parse(localStorage.getItem('elegan_orders') || '[]');
+                      const foundOrder = cachedOrders.find((o: any) => o.id === lastOrderId) || cachedOrders[0];
+                      if (foundOrder) {
+                        setPrintableOrder(foundOrder);
+                        setTimeout(() => window.print(), 150);
+                      } else {
+                        window.print();
+                      }
+                    } catch (e) {
+                      window.print();
+                    }
+                  }}
+                  className="bg-amber-500 hover:bg-amber-600 text-white w-full py-3.5 text-xs tracking-widest uppercase font-bold transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-sm rounded-xl"
+                >
+                  <Printer size={16} /> Print Cash Memo / Invoice
+                </motion.button>
+                <motion.button 
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => handleNavigate('my-orders')} 
-                  className="bg-zinc-900 hover:bg-zinc-800 text-white w-full py-4 text-xs tracking-widest uppercase font-bold transition-colors cursor-pointer"
+                  className="bg-zinc-900 hover:bg-zinc-800 text-white w-full py-4 text-xs tracking-widest uppercase font-bold transition-colors cursor-pointer rounded-xl"
                 >
                   View My Orders
                 </motion.button>
@@ -9687,6 +9917,9 @@ export default function App() {
         onLogout={handleLogout}
         onNavigate={handleNavigate}
       />
+
+      {/* Hidden Printable Invoice for window.print() */}
+      <OrderInvoicePrint order={printableOrder} />
     </div>
   );
 }
